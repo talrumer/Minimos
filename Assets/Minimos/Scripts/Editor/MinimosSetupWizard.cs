@@ -1,8 +1,15 @@
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Minimos.Audio;
 using Minimos.Teams;
+using Unity.Cinemachine;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+using TMPro;
 
 // Alias to avoid namespace collision with UnityEngine.Camera
 using MinimosCamera = Minimos.Camera;
@@ -10,54 +17,165 @@ using MinimosCamera = Minimos.Camera;
 namespace Minimos.Editor
 {
     /// <summary>
-    /// One-click setup wizard that creates all ScriptableObjects, prefabs, and
-    /// the GameBootstrap object needed to run Minimos.
-    /// Access via the Unity menu: Minimos → Setup Wizard → ...
+    /// One-click setup wizard that automates ALL project setup:
+    /// scenes, build settings, input actions, ScriptableObjects, prefabs,
+    /// GameBootstrap, cameras, basic UI, and player settings.
+    ///
+    /// Access via: Minimos → Setup Wizard → 🚀 Run Full Setup
     /// </summary>
     public static class MinimosSetupWizard
     {
         private const string DataPath = "Assets/Minimos/Data";
         private const string PrefabPath = "Assets/Minimos/Prefabs";
+        private const string ScenePath = "Assets/Minimos/Scenes";
+
+        private static readonly string[] SceneNames = { "SplashScreen", "MainMenu", "CharacterStudio", "Lobby", "Gameplay", "Results" };
 
         // =============================================
-        // 🚀 FULL SETUP (does everything)
+        // 🚀 FULL SETUP (does EVERYTHING)
         // =============================================
 
         [MenuItem("Minimos/Setup Wizard/🚀 Run Full Setup (All Steps)", false, 0)]
         public static void RunFullSetup()
+        {
+            EditorUtility.DisplayProgressBar("Minimos Setup", "Creating scenes...", 0.05f);
+            CreateScenes();
+
+            EditorUtility.DisplayProgressBar("Minimos Setup", "Configuring input actions...", 0.1f);
+            ConfigureInputActions();
+
+            EditorUtility.DisplayProgressBar("Minimos Setup", "Creating team data...", 0.15f);
+            CreateTeamData();
+
+            EditorUtility.DisplayProgressBar("Minimos Setup", "Creating audio libraries...", 0.2f);
+            CreateAudioLibraries();
+            CreateAnnouncerConfig();
+
+            EditorUtility.DisplayProgressBar("Minimos Setup", "Creating mini-game configs...", 0.25f);
+            CreateMiniGameConfigs();
+            CreatePowerUpConfigs();
+
+            EditorUtility.DisplayProgressBar("Minimos Setup", "Creating prefabs...", 0.35f);
+            CreatePlayerPrefab();
+            CreateProjectilePrefab();
+
+            EditorUtility.DisplayProgressBar("Minimos Setup", "Configuring build settings...", 0.4f);
+            ConfigureBuildSettings();
+            ConfigurePlayerSettings();
+
+            // Now open SplashScreen and create GameBootstrap there
+            EditorUtility.DisplayProgressBar("Minimos Setup", "Setting up SplashScreen scene...", 0.5f);
+            OpenSceneAndSetup("SplashScreen", SetupSplashScreen);
+
+            EditorUtility.DisplayProgressBar("Minimos Setup", "Setting up MainMenu scene...", 0.6f);
+            OpenSceneAndSetup("MainMenu", SetupMainMenuScene);
+
+            EditorUtility.DisplayProgressBar("Minimos Setup", "Setting up Lobby scene...", 0.65f);
+            OpenSceneAndSetup("Lobby", SetupLobbyScene);
+
+            EditorUtility.DisplayProgressBar("Minimos Setup", "Setting up Gameplay scene...", 0.75f);
+            OpenSceneAndSetup("Gameplay", SetupGameplayScene);
+
+            EditorUtility.DisplayProgressBar("Minimos Setup", "Setting up Results scene...", 0.85f);
+            OpenSceneAndSetup("Results", SetupResultsScene);
+
+            // Return to SplashScreen (the boot scene)
+            EditorUtility.DisplayProgressBar("Minimos Setup", "Finalizing...", 0.95f);
+            EditorSceneManager.OpenScene($"{ScenePath}/SplashScreen.unity");
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            EditorUtility.ClearProgressBar();
+
+            Debug.Log("✅ [Minimos Setup] FULL SETUP COMPLETE!");
+            EditorUtility.DisplayDialog("Minimos Setup Complete",
+                "Everything is set up and ready!\n\n" +
+                "✅ 6 Scenes created and added to Build Settings\n" +
+                "✅ Input Actions configured\n" +
+                "✅ All ScriptableObjects created\n" +
+                "✅ Player + Projectile prefabs created\n" +
+                "✅ GameBootstrap in SplashScreen (all managers wired)\n" +
+                "✅ 5 Cinemachine cameras in Gameplay scene\n" +
+                "✅ Basic UI in all scenes\n" +
+                "✅ Build Settings + Player Settings configured\n\n" +
+                "Remaining manual steps:\n" +
+                "• Link Unity Dashboard (Edit → Project Settings → Services)\n" +
+                "• Design your maps with imported asset packs\n" +
+                "• Populate audio libraries with clips (optional for now)",
+                "Let's go!");
+        }
+
+        // =============================================
+        // STEP 1: SCENES
+        // =============================================
+
+        [MenuItem("Minimos/Setup Wizard/1. Create Scenes", false, 100)]
+        public static void CreateScenes()
+        {
+            EnsureDirectory(ScenePath);
+
+            foreach (string sceneName in SceneNames)
+            {
+                string scenePath = $"{ScenePath}/{sceneName}.unity";
+                if (File.Exists(scenePath)) continue;
+
+                var newScene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
+                EditorSceneManager.SaveScene(newScene, scenePath);
+                Debug.Log($"📝 [Minimos Setup] Created scene: {sceneName}");
+            }
+
+            Debug.Log("✅ [Minimos Setup] All 6 scenes created.");
+        }
+
+        // =============================================
+        // STEP 2: INPUT ACTIONS
+        // =============================================
+
+        [MenuItem("Minimos/Setup Wizard/2. Configure Input Actions", false, 101)]
+        public static void ConfigureInputActions()
+        {
+            string inputActionsPath = "Assets/Minimos/Input/MinimosInputActions.inputactions";
+            var importer = AssetImporter.GetAtPath(inputActionsPath);
+            if (importer == null)
+            {
+                Debug.LogWarning("⚠️ [Minimos Setup] MinimosInputActions.inputactions not found.");
+                return;
+            }
+
+            // The InputActionImporter has properties for generating C# class
+            var so = new SerializedObject(importer);
+            var generateProp = so.FindProperty("m_GenerateWrapperCode");
+            var namespaceProp = so.FindProperty("m_WrapperCodeNamespace");
+
+            if (generateProp != null)
+            {
+                generateProp.boolValue = true;
+                if (namespaceProp != null)
+                    namespaceProp.stringValue = "Minimos.Input";
+                so.ApplyModifiedPropertiesWithoutUndo();
+                importer.SaveAndReimport();
+                Debug.Log("✅ [Minimos Setup] Input Actions: Generate C# Class enabled, namespace set to Minimos.Input.");
+            }
+            else
+            {
+                Debug.LogWarning("⚠️ [Minimos Setup] Could not find GenerateWrapperCode property. You may need to enable it manually.");
+            }
+        }
+
+        // =============================================
+        // STEP 3: SCRIPTABLE OBJECTS
+        // =============================================
+
+        [MenuItem("Minimos/Setup Wizard/3. Create ScriptableObjects", false, 102)]
+        public static void CreateAllScriptableObjects()
         {
             CreateTeamData();
             CreateAudioLibraries();
             CreateAnnouncerConfig();
             CreateMiniGameConfigs();
             CreatePowerUpConfigs();
-            CreateGameBootstrap();
-            CreatePlayerPrefab();
-            CreateProjectilePrefab();
-            RegisterNetworkPrefabs();
-
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
-
-            Debug.Log("✅ [Minimos Setup] Full setup complete! Check Assets/Minimos/Data/ and Assets/Minimos/Prefabs/");
-            EditorUtility.DisplayDialog("Minimos Setup Complete",
-                "All ScriptableObjects, prefabs, and GameBootstrap have been created.\n\n" +
-                "✅ GameBootstrap placed in the current scene (all references wired)\n" +
-                "✅ MinimoPlayer + Projectile prefabs created\n" +
-                "✅ Network prefabs auto-registered\n\n" +
-                "⚠️ IMPORTANT: Open the SplashScreen scene FIRST, then run this wizard.\n" +
-                "Save the scene (Ctrl+S / Cmd+S) to persist the GameBootstrap.\n\n" +
-                "Optional: Populate audio libraries with clips from imported asset packs.",
-                "Got it!");
         }
 
-        // =============================================
-        // INDIVIDUAL STEPS
-        // =============================================
-
-        // --- Step 4b: Team Data ---
-
-        [MenuItem("Minimos/Setup Wizard/Create Team Data (6 teams)", false, 100)]
         public static void CreateTeamData()
         {
             string path = $"{DataPath}/Teams";
@@ -73,68 +191,30 @@ namespace Minimos.Editor
             Debug.Log("✅ [Minimos Setup] Created 6 TeamData assets.");
         }
 
-        private static void CreateTeamDataAsset(string folder, int index, string teamName,
-            Color primary, Color accent, string primaryHex, string accentHex)
-        {
-            string assetPath = $"{folder}/Team_{teamName.Replace(" ", "")}.asset";
-            if (AssetExists(assetPath)) return;
-
-            var data = ScriptableObject.CreateInstance<TeamData>();
-            AssetDatabase.CreateAsset(data, assetPath);
-
-            var so = new SerializedObject(data);
-            so.FindProperty("teamIndex").intValue = index;
-            so.FindProperty("teamName").stringValue = teamName;
-            so.FindProperty("teamColor").colorValue = primary;
-            so.FindProperty("teamColorHex").stringValue = primaryHex;
-            so.FindProperty("accentColor").colorValue = accent;
-            so.FindProperty("accentColorHex").stringValue = accentHex;
-            so.ApplyModifiedPropertiesWithoutUndo();
-        }
-
-        // --- Step 4c: Audio Libraries ---
-
-        [MenuItem("Minimos/Setup Wizard/Create Audio Libraries", false, 101)]
         public static void CreateAudioLibraries()
         {
             string path = $"{DataPath}/Audio";
             EnsureDirectory(path);
 
             if (!AssetExists($"{path}/SFXLibrary.asset"))
-            {
-                var sfx = ScriptableObject.CreateInstance<SFXLibrary>();
-                AssetDatabase.CreateAsset(sfx, $"{path}/SFXLibrary.asset");
-            }
-
+                AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<SFXLibrary>(), $"{path}/SFXLibrary.asset");
             if (!AssetExists($"{path}/MusicLibrary.asset"))
-            {
-                var music = ScriptableObject.CreateInstance<MusicLibrary>();
-                AssetDatabase.CreateAsset(music, $"{path}/MusicLibrary.asset");
-            }
+                AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<MusicLibrary>(), $"{path}/MusicLibrary.asset");
 
-            Debug.Log("✅ [Minimos Setup] Created SFXLibrary and MusicLibrary assets. Populate with clips from imported packs.");
+            Debug.Log("✅ [Minimos Setup] Created audio libraries.");
         }
 
-        // --- Step 4d: Announcer Config ---
-
-        [MenuItem("Minimos/Setup Wizard/Create Announcer Config", false, 102)]
         public static void CreateAnnouncerConfig()
         {
             string path = $"{DataPath}/Audio";
             EnsureDirectory(path);
 
             if (!AssetExists($"{path}/AnnouncerConfig.asset"))
-            {
-                var config = ScriptableObject.CreateInstance<Announcer.AnnouncerConfig>();
-                AssetDatabase.CreateAsset(config, $"{path}/AnnouncerConfig.asset");
-            }
+                AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<Announcer.AnnouncerConfig>(), $"{path}/AnnouncerConfig.asset");
 
-            Debug.Log("✅ [Minimos Setup] Created AnnouncerConfig asset. Populate with voice clips.");
+            Debug.Log("✅ [Minimos Setup] Created AnnouncerConfig.");
         }
 
-        // --- MiniGame Configs ---
-
-        [MenuItem("Minimos/Setup Wizard/Create MiniGame Configs", false, 103)]
         public static void CreateMiniGameConfigs()
         {
             string path = $"{DataPath}/MiniGames";
@@ -142,240 +222,61 @@ namespace Minimos.Editor
 
             CreateMiniGameConfig(path, "Capture The Flags",
                 "Grab flags and hold them to earn points. First to 100 wins!",
-                MiniGames.MiniGameCategory.Objective, 3, 6, 300f, 100,
-                MiniGames.CameraMode.Follow);
-
+                MiniGames.MiniGameCategory.Objective, 3, 6, 300f, 100, MiniGames.CameraMode.Follow);
             CreateMiniGameConfig(path, "King of the Hill",
                 "Hold the zone to score points. Both teammates inside = bonus!",
-                MiniGames.MiniGameCategory.Objective, 2, 6, 180f, 0,
-                MiniGames.CameraMode.Arena);
+                MiniGames.MiniGameCategory.Objective, 2, 6, 180f, 0, MiniGames.CameraMode.Arena);
 
-            Debug.Log("✅ [Minimos Setup] Created CTF and KOTH MiniGameConfig assets.");
+            Debug.Log("✅ [Minimos Setup] Created MiniGameConfig assets.");
         }
 
-        private static void CreateMiniGameConfig(string folder, string gameName, string description,
-            MiniGames.MiniGameCategory category, int minTeams, int maxTeams,
-            float duration, int scoreToWin, MiniGames.CameraMode cameraMode)
-        {
-            string safeName = gameName.Replace(" ", "");
-            string assetPath = $"{folder}/{safeName}_Config.asset";
-            if (AssetExists(assetPath)) return;
-
-            var config = ScriptableObject.CreateInstance<MiniGames.MiniGameConfig>();
-            AssetDatabase.CreateAsset(config, assetPath);
-
-            var so = new SerializedObject(config);
-            so.FindProperty("gameName").stringValue = gameName;
-            so.FindProperty("description").stringValue = description;
-            so.FindProperty("category").enumValueIndex = (int)category;
-            so.FindProperty("minTeams").intValue = minTeams;
-            so.FindProperty("maxTeams").intValue = maxTeams;
-            so.FindProperty("duration").floatValue = duration;
-            so.FindProperty("scoreToWin").intValue = scoreToWin;
-            so.FindProperty("cameraMode").enumValueIndex = (int)cameraMode;
-            so.FindProperty("powerUpsEnabled").boolValue = true;
-            so.FindProperty("rulesText").stringValue = description;
-            so.ApplyModifiedPropertiesWithoutUndo();
-        }
-
-        // --- Power-Up Configs ---
-
-        [MenuItem("Minimos/Setup Wizard/Create PowerUp Configs", false, 104)]
         public static void CreatePowerUpConfigs()
         {
             string path = $"{DataPath}/PowerUps";
             EnsureDirectory(path);
 
-            CreatePowerUpConfig(path, "Speed Boost", "2x movement speed for 3 seconds.",
-                PowerUps.PowerUpRarity.Common, 3f);
-            CreatePowerUpConfig(path, "Mega Punch", "Next melee attack deals 3x knockback.",
-                PowerUps.PowerUpRarity.Uncommon, 0f);
-            CreatePowerUpConfig(path, "Buddy Shield", "Both teammates get a 1-hit shield.",
-                PowerUps.PowerUpRarity.Rare, 0f);
-            CreatePowerUpConfig(path, "Freeze Bomb", "Throw to root nearby enemies for 2 seconds.",
-                PowerUps.PowerUpRarity.Uncommon, 0f);
+            CreatePowerUpConfig(path, "Speed Boost", "2x movement speed for 3 seconds.", PowerUps.PowerUpRarity.Common, 3f);
+            CreatePowerUpConfig(path, "Mega Punch", "Next melee attack deals 3x knockback.", PowerUps.PowerUpRarity.Uncommon, 0f);
+            CreatePowerUpConfig(path, "Buddy Shield", "Both teammates get a 1-hit shield.", PowerUps.PowerUpRarity.Rare, 0f);
+            CreatePowerUpConfig(path, "Freeze Bomb", "Throw to root nearby enemies for 2 seconds.", PowerUps.PowerUpRarity.Uncommon, 0f);
 
-            Debug.Log("✅ [Minimos Setup] Created 4 PowerUpConfig assets.");
+            Debug.Log("✅ [Minimos Setup] Created PowerUpConfig assets.");
         }
 
-        private static void CreatePowerUpConfig(string folder, string powerUpName, string description,
-            PowerUps.PowerUpRarity rarity, float duration)
+        // =============================================
+        // STEP 4: PREFABS
+        // =============================================
+
+        [MenuItem("Minimos/Setup Wizard/4. Create Prefabs", false, 103)]
+        public static void CreateAllPrefabs()
         {
-            string safeName = powerUpName.Replace(" ", "");
-            string assetPath = $"{folder}/{safeName}_Config.asset";
-            if (AssetExists(assetPath)) return;
-
-            var config = ScriptableObject.CreateInstance<PowerUps.PowerUpConfig>();
-            AssetDatabase.CreateAsset(config, assetPath);
-
-            var so = new SerializedObject(config);
-            so.FindProperty("powerUpName").stringValue = powerUpName;
-            so.FindProperty("description").stringValue = description;
-            so.FindProperty("rarity").enumValueIndex = (int)rarity;
-            so.FindProperty("duration").floatValue = duration;
-            so.ApplyModifiedPropertiesWithoutUndo();
+            CreatePlayerPrefab();
+            CreateProjectilePrefab();
         }
 
-        // --- Step 4a: GameBootstrap (placed in current scene) ---
-
-        [MenuItem("Minimos/Setup Wizard/Create GameBootstrap in Scene", false, 200)]
-        public static void CreateGameBootstrap()
-        {
-            // Check if GameBootstrap already exists in the scene
-            var existing = GameObject.Find("GameBootstrap");
-            if (existing != null)
-            {
-                Debug.Log("📝 [Minimos Setup] GameBootstrap already exists in scene. Skipping.");
-                return;
-            }
-
-            // Create the GameObject directly in the current scene
-            // This avoids prefab self-reference issues (transport ↔ NetworkManager on same object)
-            var go = new GameObject("GameBootstrap");
-            Undo.RegisterCreatedObjectUndo(go, "Create GameBootstrap");
-
-            // Unity's NetworkManager + Transport
-            var netManager = go.AddComponent<Unity.Netcode.NetworkManager>();
-            var transport = go.AddComponent<Unity.Netcode.Transports.UTP.UnityTransport>();
-
-            // Wire transport → NetworkManager (works on scene objects!)
-            var soNet = new SerializedObject(netManager);
-            var transportProp = soNet.FindProperty("NetworkConfig.NetworkTransport");
-            if (transportProp != null)
-            {
-                transportProp.objectReferenceValue = transport;
-                soNet.ApplyModifiedPropertiesWithoutUndo();
-            }
-            else
-            {
-                Debug.LogWarning("⚠️ [Minimos Setup] Could not find 'NetworkConfig.NetworkTransport'. Trying fallback...");
-                // Fallback: try top-level property
-                var fallback = soNet.FindProperty("NetworkTransport");
-                if (fallback != null)
-                {
-                    fallback.objectReferenceValue = transport;
-                    soNet.ApplyModifiedPropertiesWithoutUndo();
-                }
-            }
-
-            // Wire player prefab if it exists
-            var playerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabPath}/Player/MinimoPlayer.prefab");
-            if (playerPrefab != null)
-            {
-                var playerProp = soNet.FindProperty("NetworkConfig.PlayerPrefab");
-                if (playerProp != null)
-                {
-                    playerProp.objectReferenceValue = playerPrefab;
-                    soNet.ApplyModifiedPropertiesWithoutUndo();
-                }
-            }
-
-            // Our managers
-            go.AddComponent<Core.GameManager>();
-            go.AddComponent<Core.SceneLoader>();
-            go.AddComponent<Audio.AudioManager>();
-            var teamManager = go.AddComponent<Teams.TeamManager>();
-            go.AddComponent<Minimos.UI.UIManager>();
-            go.AddComponent<MinimosCamera.CameraManager>();
-            var announcerMgr = go.AddComponent<Announcer.AnnouncerManager>();
-            go.AddComponent<Firebase.FirebaseManager>();
-
-            // Our NetworkGameManager — wire the networkManager reference
-            var netGameManager = go.AddComponent<Networking.NetworkGameManager>();
-            var soNetGame = new SerializedObject(netGameManager);
-            var netManagerRef = soNetGame.FindProperty("networkManager");
-            if (netManagerRef != null)
-            {
-                netManagerRef.objectReferenceValue = netManager;
-                soNetGame.ApplyModifiedPropertiesWithoutUndo();
-            }
-
-            // Wire TeamData assets
-            var teamAssets = new TeamData[6];
-            string[] teamNames = { "CoralRed", "SkyBlue", "MintGreen", "SunnyYellow", "PeachOrange", "LavenderPurple" };
-            for (int i = 0; i < teamNames.Length; i++)
-            {
-                teamAssets[i] = AssetDatabase.LoadAssetAtPath<TeamData>($"{DataPath}/Teams/Team_{teamNames[i]}.asset");
-            }
-
-            var soTeam = new SerializedObject(teamManager);
-            var teamDataProp = soTeam.FindProperty("teamDataAssets");
-            if (teamDataProp != null)
-            {
-                teamDataProp.arraySize = 6;
-                for (int i = 0; i < 6; i++)
-                {
-                    teamDataProp.GetArrayElementAtIndex(i).objectReferenceValue = teamAssets[i];
-                }
-                soTeam.ApplyModifiedPropertiesWithoutUndo();
-            }
-            else
-            {
-                Debug.LogWarning("⚠️ [Minimos Setup] Could not find 'teamDataAssets' property on TeamManager.");
-            }
-
-            // Wire AnnouncerConfig
-            var announcerConfig = AssetDatabase.LoadAssetAtPath<Announcer.AnnouncerConfig>($"{DataPath}/Audio/AnnouncerConfig.asset");
-            if (announcerConfig != null)
-            {
-                var soAnnouncer = new SerializedObject(announcerMgr);
-                var configProp = soAnnouncer.FindProperty("config");
-                if (configProp != null)
-                {
-                    configProp.objectReferenceValue = announcerConfig;
-                    soAnnouncer.ApplyModifiedPropertiesWithoutUndo();
-                }
-            }
-            else
-            {
-                Debug.LogWarning("⚠️ [Minimos Setup] AnnouncerConfig asset not found.");
-            }
-
-            // Mark scene dirty so user is prompted to save
-            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(
-                UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene());
-
-            Debug.Log("✅ [Minimos Setup] Created GameBootstrap in current scene with all components wired. Save the scene (Ctrl+S) to persist!");
-        }
-
-        // --- Step 5: Player Prefab ---
-
-        [MenuItem("Minimos/Setup Wizard/Create Player Prefab", false, 201)]
         public static void CreatePlayerPrefab()
         {
             string prefabDir = $"{PrefabPath}/Player";
             EnsureDirectory(prefabDir);
-
             string prefabAssetPath = $"{prefabDir}/MinimoPlayer.prefab";
-            if (AssetExists(prefabAssetPath))
-            {
-                Debug.Log("📝 [Minimos Setup] MinimoPlayer prefab already exists. Skipping.");
-                return;
-            }
+            if (AssetExists(prefabAssetPath)) return;
 
-            // 1) Build the GameObject in memory
             var player = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             player.name = "MinimoPlayer";
 
-            // Apply TeamColorToon shader if available
+            // Apply team color shader
             var shader = Shader.Find("Minimos/TeamColorToon");
             if (shader != null)
             {
                 string matPath = "Assets/Minimos/Materials/TeamColors/MinimoBody.mat";
                 EnsureDirectory("Assets/Minimos/Materials/TeamColors");
                 if (!AssetExists(matPath))
-                {
-                    var mat = new Material(shader) { name = "MinimoBody" };
-                    AssetDatabase.CreateAsset(mat, matPath);
-                }
-                player.GetComponent<Renderer>().sharedMaterial =
-                    AssetDatabase.LoadAssetAtPath<Material>(matPath);
+                    AssetDatabase.CreateAsset(new Material(shader) { name = "MinimoBody" }, matPath);
+                player.GetComponent<Renderer>().sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(matPath);
             }
 
-            // NetworkObject
             player.AddComponent<Unity.Netcode.NetworkObject>();
 
-            // Replace CapsuleCollider with CharacterController
             var cc = player.GetComponent<CapsuleCollider>();
             if (cc != null) Object.DestroyImmediate(cc);
             var charController = player.AddComponent<CharacterController>();
@@ -383,7 +284,6 @@ namespace Minimos.Editor
             charController.height = 2f;
             charController.radius = 0.5f;
 
-            // Player scripts
             player.AddComponent<Player.PlayerController>();
             player.AddComponent<Player.PlayerCombat>();
             player.AddComponent<Player.PlayerVisuals>();
@@ -391,13 +291,11 @@ namespace Minimos.Editor
             player.AddComponent<Player.PlayerSetup>();
             player.AddComponent<PowerUps.PowerUpInventory>();
 
-            // Attachment point children
             CreateChildTransform(player, "HeadSlot", new Vector3(0, 2.2f, 0));
             CreateChildTransform(player, "FaceSlot", new Vector3(0, 1.6f, 0.5f));
             CreateChildTransform(player, "BackSlot", new Vector3(0, 1.2f, -0.5f));
             CreateChildTransform(player, "FeetSlot", new Vector3(0, 0f, 0));
 
-            // Nameplate (World Space Canvas)
             var nameplateCanvas = new GameObject("NameplateCanvas");
             nameplateCanvas.transform.SetParent(player.transform);
             nameplateCanvas.transform.localPosition = new Vector3(0, 2.5f, 0);
@@ -406,11 +304,10 @@ namespace Minimos.Editor
             canvas.GetComponent<RectTransform>().sizeDelta = new Vector2(2f, 0.5f);
             canvas.transform.localScale = Vector3.one * 0.01f;
 
-            // 2) Save as prefab FIRST
             PrefabUtility.SaveAsPrefabAsset(player, prefabAssetPath);
             Object.DestroyImmediate(player);
 
-            // 3) Load saved prefab and wire serialized references
+            // Wire serialized references on the saved prefab
             var prefabAsset = AssetDatabase.LoadAssetAtPath<GameObject>(prefabAssetPath);
             var visuals = prefabAsset.GetComponent<Player.PlayerVisuals>();
             if (visuals != null)
@@ -426,44 +323,25 @@ namespace Minimos.Editor
             }
 
             AssetDatabase.SaveAssets();
-            Debug.Log("✅ [Minimos Setup] Created MinimoPlayer prefab with all components and attachment points.");
+            Debug.Log("✅ [Minimos Setup] Created MinimoPlayer prefab.");
         }
 
-        // --- Step 6: Projectile Prefab ---
-
-        [MenuItem("Minimos/Setup Wizard/Create Projectile Prefab", false, 202)]
         public static void CreateProjectilePrefab()
         {
             string prefabDir = $"{PrefabPath}/Player";
             EnsureDirectory(prefabDir);
-
             string prefabAssetPath = $"{prefabDir}/Projectile.prefab";
-            if (AssetExists(prefabAssetPath))
-            {
-                Debug.Log("📝 [Minimos Setup] Projectile prefab already exists. Skipping.");
-                return;
-            }
+            if (AssetExists(prefabAssetPath)) return;
 
             var proj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             proj.name = "Projectile";
             proj.transform.localScale = Vector3.one * 0.3f;
-
-            // Make trigger
-            var collider = proj.GetComponent<SphereCollider>();
-            collider.isTrigger = true;
-
-            // NetworkObject
+            proj.GetComponent<SphereCollider>().isTrigger = true;
             proj.AddComponent<Unity.Netcode.NetworkObject>();
-
-            // Rigidbody (kinematic — movement handled by script)
             var rb = proj.AddComponent<Rigidbody>();
             rb.isKinematic = true;
             rb.useGravity = false;
-
-            // Projectile script
             proj.AddComponent<Player.Projectile>();
-
-            // Trail renderer
             var trail = proj.AddComponent<TrailRenderer>();
             trail.startWidth = 0.15f;
             trail.endWidth = 0f;
@@ -475,27 +353,331 @@ namespace Minimos.Editor
 
             PrefabUtility.SaveAsPrefabAsset(proj, prefabAssetPath);
             Object.DestroyImmediate(proj);
-
             Debug.Log("✅ [Minimos Setup] Created Projectile prefab.");
         }
 
-        // --- Register Network Prefabs on NetworkManager ---
+        // =============================================
+        // STEP 5: BUILD + PLAYER SETTINGS
+        // =============================================
 
-        [MenuItem("Minimos/Setup Wizard/Register Network Prefabs", false, 203)]
-        public static void RegisterNetworkPrefabs()
+        [MenuItem("Minimos/Setup Wizard/5. Configure Build Settings", false, 104)]
+        public static void ConfigureBuildSettings()
         {
-            // Find NetworkManager in the current scene (not a prefab)
-            var netManager = Object.FindAnyObjectByType<Unity.Netcode.NetworkManager>();
-            if (netManager == null)
+            var scenes = new List<EditorBuildSettingsScene>();
+            foreach (string sceneName in SceneNames)
             {
-                Debug.LogWarning("⚠️ [Minimos Setup] NetworkManager not found in scene. Run 'Create GameBootstrap in Scene' first.");
+                string path = $"{ScenePath}/{sceneName}.unity";
+                if (File.Exists(path))
+                    scenes.Add(new EditorBuildSettingsScene(path, true));
+            }
+            EditorBuildSettings.scenes = scenes.ToArray();
+            Debug.Log($"✅ [Minimos Setup] Build Settings: {scenes.Count} scenes configured in correct order.");
+        }
+
+        public static void ConfigurePlayerSettings()
+        {
+            PlayerSettings.companyName = "Pexon";
+            PlayerSettings.productName = "Minimos";
+            PlayerSettings.colorSpace = ColorSpace.Linear;
+            Debug.Log("✅ [Minimos Setup] Player Settings: Pexon / Minimos / Linear color space.");
+        }
+
+        // =============================================
+        // PER-SCENE SETUP
+        // =============================================
+
+        private static void OpenSceneAndSetup(string sceneName, System.Action setupAction)
+        {
+            string path = $"{ScenePath}/{sceneName}.unity";
+            if (!File.Exists(path))
+            {
+                Debug.LogWarning($"⚠️ [Minimos Setup] Scene not found: {path}");
                 return;
             }
 
-            var playerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabPath}/Player/MinimoPlayer.prefab");
-            var projectilePrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabPath}/Player/Projectile.prefab");
+            EditorSceneManager.OpenScene(path);
+            setupAction();
+            EditorSceneManager.SaveScene(SceneManager.GetActiveScene());
+        }
 
-            // 1) Create our NetworkPrefabsList asset with Minimos prefabs
+        // --- SplashScreen: GameBootstrap + NetworkManager ---
+        private static void SetupSplashScreen()
+        {
+            if (GameObject.Find("GameBootstrap") != null) return;
+
+            var go = new GameObject("GameBootstrap");
+
+            // Unity's NetworkManager + Transport
+            var netManager = go.AddComponent<Unity.Netcode.NetworkManager>();
+            var transport = go.AddComponent<Unity.Netcode.Transports.UTP.UnityTransport>();
+
+            // Wire transport
+            var soNet = new SerializedObject(netManager);
+            SetSerializedProperty(soNet, "NetworkConfig.NetworkTransport", transport);
+
+            // Wire player prefab
+            var playerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabPath}/Player/MinimoPlayer.prefab");
+            if (playerPrefab != null)
+                SetSerializedProperty(soNet, "NetworkConfig.PlayerPrefab", playerPrefab);
+
+            // Create and wire network prefabs list
+            CreateAndWireNetworkPrefabsList(soNet);
+            soNet.ApplyModifiedPropertiesWithoutUndo();
+
+            // Our managers
+            go.AddComponent<Core.GameManager>();
+            go.AddComponent<Core.SceneLoader>();
+            go.AddComponent<Audio.AudioManager>();
+            var teamMgr = go.AddComponent<Teams.TeamManager>();
+            go.AddComponent<Minimos.UI.UIManager>();
+            go.AddComponent<MinimosCamera.CameraManager>();
+            var announcerMgr = go.AddComponent<Announcer.AnnouncerManager>();
+            go.AddComponent<Firebase.FirebaseManager>();
+            var netGameMgr = go.AddComponent<Networking.NetworkGameManager>();
+
+            // Wire NetworkGameManager → NetworkManager
+            var soNetGame = new SerializedObject(netGameMgr);
+            SetSerializedProperty(soNetGame, "networkManager", netManager);
+            soNetGame.ApplyModifiedPropertiesWithoutUndo();
+
+            // Wire TeamData
+            WireTeamData(teamMgr);
+
+            // Wire AnnouncerConfig
+            var announcerConfig = AssetDatabase.LoadAssetAtPath<Announcer.AnnouncerConfig>($"{DataPath}/Audio/AnnouncerConfig.asset");
+            if (announcerConfig != null)
+            {
+                var soAnnouncer = new SerializedObject(announcerMgr);
+                SetSerializedProperty(soAnnouncer, "config", announcerConfig);
+                soAnnouncer.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            Debug.Log("✅ [Minimos Setup] SplashScreen: GameBootstrap created with all managers wired.");
+        }
+
+        // --- MainMenu: Canvas with buttons ---
+        private static void SetupMainMenuScene()
+        {
+            if (GameObject.Find("MainMenuCanvas") != null) return;
+
+            var canvasGo = CreateUICanvas("MainMenuCanvas");
+            var menuController = canvasGo.AddComponent<UI.MainMenuController>();
+
+            // Create buttons
+            var playBtn = CreateUIButton(canvasGo.transform, "PlayButton", "▶  PLAY", new Vector2(0, 60), new Vector2(300, 60));
+            var studioBtn = CreateUIButton(canvasGo.transform, "CharacterStudioButton", "🧑  CHARACTER", new Vector2(0, -10), new Vector2(300, 60));
+            var settingsBtn = CreateUIButton(canvasGo.transform, "SettingsButton", "⚙  SETTINGS", new Vector2(0, -80), new Vector2(300, 60));
+            var quitBtn = CreateUIButton(canvasGo.transform, "QuitButton", "✖  QUIT", new Vector2(0, -150), new Vector2(300, 60));
+
+            // Profile display
+            var profilePanel = new GameObject("ProfilePanel");
+            profilePanel.transform.SetParent(canvasGo.transform, false);
+            var profileRect = profilePanel.AddComponent<RectTransform>();
+            profileRect.anchorMin = new Vector2(0, 1);
+            profileRect.anchorMax = new Vector2(0, 1);
+            profileRect.pivot = new Vector2(0, 1);
+            profileRect.anchoredPosition = new Vector2(20, -20);
+            profileRect.sizeDelta = new Vector2(300, 80);
+
+            var nameText = CreateUIText(profilePanel.transform, "PlayerNameText", "Player", new Vector2(0, 15), 24);
+            var levelText = CreateUIText(profilePanel.transform, "LevelText", "Level 1 | 0 Coins", new Vector2(0, -15), 16);
+
+            // Wire to controller
+            var so = new SerializedObject(menuController);
+            SetPropertyRef(so, "playButton", playBtn.GetComponent<Button>());
+            SetPropertyRef(so, "characterStudioButton", studioBtn.GetComponent<Button>());
+            SetPropertyRef(so, "settingsButton", settingsBtn.GetComponent<Button>());
+            SetPropertyRef(so, "quitButton", quitBtn.GetComponent<Button>());
+            SetPropertyRef(so, "playerNameText", nameText);
+            SetPropertyRef(so, "playerLevelText", levelText);
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            Debug.Log("✅ [Minimos Setup] MainMenu: Canvas with buttons + profile display.");
+        }
+
+        // --- Lobby: Canvas with lobby UI ---
+        private static void SetupLobbyScene()
+        {
+            if (GameObject.Find("LobbyCanvas") != null) return;
+
+            var canvasGo = CreateUICanvas("LobbyCanvas");
+            canvasGo.AddComponent<UI.LobbyUIController>();
+
+            CreateUIButton(canvasGo.transform, "QuickPlayButton", "⚡ QUICK PLAY", new Vector2(0, 100), new Vector2(280, 50));
+            CreateUIButton(canvasGo.transform, "CreatePrivateButton", "🔒 CREATE PRIVATE", new Vector2(0, 40), new Vector2(280, 50));
+            CreateUIButton(canvasGo.transform, "JoinByCodeButton", "🔗 JOIN BY CODE", new Vector2(0, -20), new Vector2(280, 50));
+            CreateUIButton(canvasGo.transform, "BackButton", "← BACK", new Vector2(0, -100), new Vector2(200, 40));
+            CreateUIText(canvasGo.transform, "RoomCodeText", "Room Code: ------", new Vector2(0, 160), 20);
+
+            Debug.Log("✅ [Minimos Setup] Lobby: Canvas with lobby UI.");
+        }
+
+        // --- Gameplay: HUD + Cameras ---
+        private static void SetupGameplayScene()
+        {
+            // HUD Canvas
+            if (GameObject.Find("GameHUDCanvas") == null)
+            {
+                var hudCanvas = CreateUICanvas("GameHUDCanvas");
+                hudCanvas.AddComponent<UI.GameHUD>();
+
+                CreateUIText(hudCanvas.transform, "TimerText", "5:00", new Vector2(0, -30), 36, TextAlignmentOptions.Top);
+                CreateUIText(hudCanvas.transform, "MiniGameNameText", "Capture The Flags", new Vector2(0, -65), 18, TextAlignmentOptions.Top);
+                CreateUIText(hudCanvas.transform, "EventPopupText", "", new Vector2(0, 0), 28);
+            }
+
+            // Cinemachine Cameras
+            if (GameObject.Find("CM_FollowCam") == null)
+            {
+                var cameraRig = new GameObject("--- Minimos Cameras ---");
+
+                var followCam = CreateCinemachineCamera("CM_FollowCam", cameraRig.transform);
+                var followComp = followCam.gameObject.AddComponent<CinemachineFollow>();
+                followComp.FollowOffset = new Vector3(0f, 5f, -8f);
+                followComp.Damping = new Vector3(0.5f, 0.5f, 0.5f);
+                followCam.gameObject.AddComponent<CinemachineRotationComposer>();
+                followCam.Priority = 10;
+
+                var arenaCam = CreateCinemachineCamera("CM_ArenaCam", cameraRig.transform);
+                arenaCam.transform.localPosition = new Vector3(0f, 25f, -15f);
+                arenaCam.transform.localRotation = Quaternion.Euler(55f, 0f, 0f);
+                arenaCam.gameObject.AddComponent<CinemachineRotationComposer>();
+
+                var sideScrollCam = CreateCinemachineCamera("CM_SideScrollCam", cameraRig.transform);
+                var sideFollow = sideScrollCam.gameObject.AddComponent<CinemachineFollow>();
+                sideFollow.FollowOffset = new Vector3(0f, 3f, -15f);
+                sideFollow.Damping = new Vector3(0.3f, 0.3f, 0f);
+                sideScrollCam.gameObject.AddComponent<CinemachineRotationComposer>();
+
+                var sportsCam = CreateCinemachineCamera("CM_SportsCam", cameraRig.transform);
+                var sportsFollow = sportsCam.gameObject.AddComponent<CinemachineFollow>();
+                sportsFollow.FollowOffset = new Vector3(0f, 12f, -18f);
+                sportsFollow.Damping = new Vector3(1f, 0.5f, 1f);
+                sportsCam.gameObject.AddComponent<CinemachineRotationComposer>();
+
+                var splitZoneCam = CreateCinemachineCamera("CM_SplitZoneCam", cameraRig.transform);
+                var splitFollow = splitZoneCam.gameObject.AddComponent<CinemachineFollow>();
+                splitFollow.FollowOffset = new Vector3(0f, 10f, -10f);
+                splitFollow.Damping = new Vector3(0.5f, 0.5f, 0.5f);
+                splitZoneCam.gameObject.AddComponent<CinemachineRotationComposer>();
+
+                // Impulse on main camera
+                var mainCam = UnityEngine.Camera.main;
+                CinemachineImpulseSource impulseSource = null;
+                if (mainCam != null)
+                {
+                    impulseSource = mainCam.GetComponent<CinemachineImpulseSource>() ?? mainCam.gameObject.AddComponent<CinemachineImpulseSource>();
+                    if (mainCam.GetComponent<CinemachineImpulseListener>() == null)
+                        mainCam.gameObject.AddComponent<CinemachineImpulseListener>();
+                }
+
+                // Wire to CameraManager on GameBootstrap (if in scene via DontDestroyOnLoad)
+                // Since GameBootstrap is in SplashScreen, CameraManager won't be in this scene yet.
+                // Instead, CameraManager will find cameras by name at runtime, OR we wire via a helper.
+                // For now, create a small bridge script that wires them at runtime.
+                var cameraWirer = cameraRig.AddComponent<MinimosCamera.GameplayCameraWirer>();
+                var soWirer = new SerializedObject(cameraWirer);
+                SetPropertyRef(soWirer, "followCamera", followCam);
+                SetPropertyRef(soWirer, "arenaCamera", arenaCam);
+                SetPropertyRef(soWirer, "sideScrollCamera", sideScrollCam);
+                SetPropertyRef(soWirer, "sportsCamera", sportsCam);
+                SetPropertyRef(soWirer, "splitZoneCamera", splitZoneCam);
+                if (impulseSource != null)
+                    SetPropertyRef(soWirer, "impulseSource", impulseSource);
+                soWirer.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            Debug.Log("✅ [Minimos Setup] Gameplay: HUD + 5 Cinemachine cameras.");
+        }
+
+        // --- Results: Podium + UI ---
+        private static void SetupResultsScene()
+        {
+            if (GameObject.Find("ResultsCanvas") != null) return;
+
+            var canvasGo = CreateUICanvas("ResultsCanvas");
+            canvasGo.AddComponent<UI.ResultsScreenController>();
+
+            CreateUIText(canvasGo.transform, "ResultsTitleText", "RESULTS", new Vector2(0, -40), 42, TextAlignmentOptions.Top);
+            CreateUIButton(canvasGo.transform, "PlayAgainButton", "🔄 PLAY AGAIN", new Vector2(-120, -200), new Vector2(220, 50));
+            CreateUIButton(canvasGo.transform, "ReturnToMenuButton", "🏠 MENU", new Vector2(120, -200), new Vector2(220, 50));
+
+            // Podium platforms
+            var podiumParent = new GameObject("Podium");
+            CreatePodiumPlatform(podiumParent.transform, "1st Place", new Vector3(0, 1.5f, 0), new Vector3(2, 3, 2), TeamColors.CoralRed);
+            CreatePodiumPlatform(podiumParent.transform, "2nd Place", new Vector3(-3, 1f, 0), new Vector3(2, 2, 2), TeamColors.SkyBlue);
+            CreatePodiumPlatform(podiumParent.transform, "3rd Place", new Vector3(3, 0.5f, 0), new Vector3(2, 1, 2), TeamColors.MintGreen);
+
+            Debug.Log("✅ [Minimos Setup] Results: Canvas + 3D podium.");
+        }
+
+        // =============================================
+        // HELPERS — SCRIPTABLE OBJECTS
+        // =============================================
+
+        private static void CreateTeamDataAsset(string folder, int index, string teamName,
+            Color primary, Color accent, string primaryHex, string accentHex)
+        {
+            string assetPath = $"{folder}/Team_{teamName.Replace(" ", "")}.asset";
+            if (AssetExists(assetPath)) return;
+
+            var data = ScriptableObject.CreateInstance<TeamData>();
+            AssetDatabase.CreateAsset(data, assetPath);
+            var so = new SerializedObject(data);
+            so.FindProperty("teamIndex").intValue = index;
+            so.FindProperty("teamName").stringValue = teamName;
+            so.FindProperty("teamColor").colorValue = primary;
+            so.FindProperty("teamColorHex").stringValue = primaryHex;
+            so.FindProperty("accentColor").colorValue = accent;
+            so.FindProperty("accentColorHex").stringValue = accentHex;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void CreateMiniGameConfig(string folder, string gameName, string description,
+            MiniGames.MiniGameCategory category, int minTeams, int maxTeams,
+            float duration, int scoreToWin, MiniGames.CameraMode cameraMode)
+        {
+            string assetPath = $"{folder}/{gameName.Replace(" ", "")}_Config.asset";
+            if (AssetExists(assetPath)) return;
+
+            var config = ScriptableObject.CreateInstance<MiniGames.MiniGameConfig>();
+            AssetDatabase.CreateAsset(config, assetPath);
+            var so = new SerializedObject(config);
+            so.FindProperty("gameName").stringValue = gameName;
+            so.FindProperty("description").stringValue = description;
+            so.FindProperty("category").enumValueIndex = (int)category;
+            so.FindProperty("minTeams").intValue = minTeams;
+            so.FindProperty("maxTeams").intValue = maxTeams;
+            so.FindProperty("duration").floatValue = duration;
+            so.FindProperty("scoreToWin").intValue = scoreToWin;
+            so.FindProperty("cameraMode").enumValueIndex = (int)cameraMode;
+            so.FindProperty("powerUpsEnabled").boolValue = true;
+            so.FindProperty("rulesText").stringValue = description;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void CreatePowerUpConfig(string folder, string powerUpName, string description,
+            PowerUps.PowerUpRarity rarity, float duration)
+        {
+            string assetPath = $"{folder}/{powerUpName.Replace(" ", "")}_Config.asset";
+            if (AssetExists(assetPath)) return;
+
+            var config = ScriptableObject.CreateInstance<PowerUps.PowerUpConfig>();
+            AssetDatabase.CreateAsset(config, assetPath);
+            var so = new SerializedObject(config);
+            so.FindProperty("powerUpName").stringValue = powerUpName;
+            so.FindProperty("description").stringValue = description;
+            so.FindProperty("rarity").enumValueIndex = (int)rarity;
+            so.FindProperty("duration").floatValue = duration;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        // =============================================
+        // HELPERS — NETWORK
+        // =============================================
+
+        private static void CreateAndWireNetworkPrefabsList(SerializedObject soNetManager)
+        {
             string prefabsListDir = $"{PrefabPath}/Network";
             EnsureDirectory(prefabsListDir);
             string prefabsListPath = $"{prefabsListDir}/MinimosNetworkPrefabs.asset";
@@ -511,54 +693,144 @@ namespace Minimos.Editor
                 AssetDatabase.CreateAsset(prefabsList, prefabsListPath);
             }
 
-            if (playerPrefab != null)
-                prefabsList.Add(new Unity.Netcode.NetworkPrefab { Prefab = playerPrefab });
-            if (projectilePrefab != null)
-                prefabsList.Add(new Unity.Netcode.NetworkPrefab { Prefab = projectilePrefab });
+            var playerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabPath}/Player/MinimoPlayer.prefab");
+            var projectilePrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabPath}/Player/Projectile.prefab");
+
+            if (playerPrefab != null) prefabsList.Add(new Unity.Netcode.NetworkPrefab { Prefab = playerPrefab });
+            if (projectilePrefab != null) prefabsList.Add(new Unity.Netcode.NetworkPrefab { Prefab = projectilePrefab });
 
             EditorUtility.SetDirty(prefabsList);
             AssetDatabase.SaveAssets();
 
-            // Reload after save
             prefabsList = AssetDatabase.LoadAssetAtPath<Unity.Netcode.NetworkPrefabsList>(prefabsListPath);
 
-            // 2) Wire onto the scene NetworkManager — REPLACE the default list with ours
-            var so = new SerializedObject(netManager);
-
-            // Set player prefab
-            if (playerPrefab != null)
+            var listProp = soNetManager.FindProperty("NetworkConfig.Prefabs.NetworkPrefabsLists");
+            if (listProp != null)
             {
-                var playerProp = so.FindProperty("NetworkConfig.PlayerPrefab");
-                if (playerProp != null)
-                    playerProp.objectReferenceValue = playerPrefab;
+                listProp.arraySize = 1;
+                listProp.GetArrayElementAtIndex(0).objectReferenceValue = prefabsList;
             }
+        }
 
-            // Replace the prefabs lists array with just our list
-            var prefabsListsProp = so.FindProperty("NetworkConfig.Prefabs.NetworkPrefabsLists");
-            if (prefabsListsProp != null)
+        private static void WireTeamData(Teams.TeamManager teamManager)
+        {
+            var teamAssets = new TeamData[6];
+            string[] names = { "CoralRed", "SkyBlue", "MintGreen", "SunnyYellow", "PeachOrange", "LavenderPurple" };
+            for (int i = 0; i < names.Length; i++)
+                teamAssets[i] = AssetDatabase.LoadAssetAtPath<TeamData>($"{DataPath}/Teams/Team_{names[i]}.asset");
+
+            var so = new SerializedObject(teamManager);
+            var prop = so.FindProperty("teamDataAssets");
+            if (prop != null)
             {
-                prefabsListsProp.arraySize = 1;
-                prefabsListsProp.GetArrayElementAtIndex(0).objectReferenceValue = prefabsList;
+                prop.arraySize = 6;
+                for (int i = 0; i < 6; i++)
+                    prop.GetArrayElementAtIndex(i).objectReferenceValue = teamAssets[i];
+                so.ApplyModifiedPropertiesWithoutUndo();
             }
-            else
-            {
-                Debug.LogWarning("⚠️ [Minimos Setup] Could not find 'NetworkConfig.Prefabs.NetworkPrefabsLists' property.");
-            }
-
-            so.ApplyModifiedPropertiesWithoutUndo();
-
-            // Mark scene dirty
-            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(
-                UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene());
-
-            int count = 0;
-            if (playerPrefab != null) count++;
-            if (projectilePrefab != null) count++;
-            Debug.Log($"✅ [Minimos Setup] Registered {count} network prefab(s). Replaced default list with MinimosNetworkPrefabs.");
         }
 
         // =============================================
-        // HELPERS
+        // HELPERS — UI
+        // =============================================
+
+        private static GameObject CreateUICanvas(string name)
+        {
+            var canvasGo = new GameObject(name);
+            var canvas = canvasGo.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvasGo.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            canvasGo.GetComponent<CanvasScaler>().referenceResolution = new Vector2(1920, 1080);
+            canvasGo.AddComponent<GraphicRaycaster>();
+
+            // EventSystem if not present
+            if (Object.FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
+            {
+                var es = new GameObject("EventSystem");
+                es.AddComponent<UnityEngine.EventSystems.EventSystem>();
+                es.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
+            }
+
+            return canvasGo;
+        }
+
+        private static GameObject CreateUIButton(Transform parent, string name, string label, Vector2 position, Vector2 size)
+        {
+            var btnGo = new GameObject(name);
+            btnGo.transform.SetParent(parent, false);
+
+            var rect = btnGo.AddComponent<RectTransform>();
+            rect.anchoredPosition = position;
+            rect.sizeDelta = size;
+
+            var image = btnGo.AddComponent<Image>();
+            image.color = new Color(0.2f, 0.2f, 0.2f, 0.9f);
+
+            btnGo.AddComponent<Button>();
+
+            // Label text
+            var textGo = new GameObject("Label");
+            textGo.transform.SetParent(btnGo.transform, false);
+            var textRect = textGo.AddComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+
+            var tmp = textGo.AddComponent<TextMeshProUGUI>();
+            tmp.text = label;
+            tmp.fontSize = 22;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.color = Color.white;
+
+            return btnGo;
+        }
+
+        private static TextMeshProUGUI CreateUIText(Transform parent, string name, string text, Vector2 position, int fontSize, TextAlignmentOptions alignment = TextAlignmentOptions.Center)
+        {
+            var textGo = new GameObject(name);
+            textGo.transform.SetParent(parent, false);
+
+            var rect = textGo.AddComponent<RectTransform>();
+            rect.anchoredPosition = position;
+            rect.sizeDelta = new Vector2(400, 50);
+
+            var tmp = textGo.AddComponent<TextMeshProUGUI>();
+            tmp.text = text;
+            tmp.fontSize = fontSize;
+            tmp.alignment = alignment;
+            tmp.color = Color.white;
+
+            return tmp;
+        }
+
+        private static void CreatePodiumPlatform(Transform parent, string name, Vector3 position, Vector3 scale, Color color)
+        {
+            var platform = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            platform.name = name;
+            platform.transform.SetParent(parent);
+            platform.transform.localPosition = position;
+            platform.transform.localScale = scale;
+            platform.GetComponent<Renderer>().sharedMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit")) { color = color };
+        }
+
+        // =============================================
+        // HELPERS — CAMERA
+        // =============================================
+
+        private static CinemachineCamera CreateCinemachineCamera(string name, Transform parent)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent);
+            go.transform.localPosition = Vector3.zero;
+            go.transform.localRotation = Quaternion.identity;
+            var cam = go.AddComponent<CinemachineCamera>();
+            cam.Priority = 0;
+            return cam;
+        }
+
+        // =============================================
+        // HELPERS — GENERAL
         // =============================================
 
         private static void EnsureDirectory(string path)
@@ -568,9 +840,7 @@ namespace Minimos.Editor
                 string parent = Path.GetDirectoryName(path)?.Replace("\\", "/");
                 string folder = Path.GetFileName(path);
                 if (parent != null && !AssetDatabase.IsValidFolder(parent))
-                {
                     EnsureDirectory(parent);
-                }
                 AssetDatabase.CreateFolder(parent, folder);
             }
         }
@@ -593,13 +863,24 @@ namespace Minimos.Editor
         {
             var prop = so.FindProperty(propName);
             if (prop != null)
+                prop.objectReferenceValue = value;
+            else
+                Debug.LogWarning($"⚠️ [Minimos Setup] Property '{propName}' not found on {so.targetObject.GetType().Name}.");
+        }
+
+        private static void SetSerializedProperty(SerializedObject so, string propPath, Object value)
+        {
+            var prop = so.FindProperty(propPath);
+            if (prop != null)
             {
                 prop.objectReferenceValue = value;
+                so.ApplyModifiedPropertiesWithoutUndo();
             }
             else
             {
-                Debug.LogWarning($"⚠️ [Minimos Setup] Property '{propName}' not found on {so.targetObject.GetType().Name}. Check field name.");
+                Debug.LogWarning($"⚠️ [Minimos Setup] Property path '{propPath}' not found.");
             }
         }
     }
+
 }

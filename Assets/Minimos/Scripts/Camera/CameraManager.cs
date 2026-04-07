@@ -136,6 +136,27 @@ namespace Minimos.Camera
 
         #endregion
 
+        #region Runtime Wiring
+
+        /// <summary>
+        /// Wires camera references at runtime. Called by GameplayCameraWirer
+        /// when the Gameplay scene loads.
+        /// </summary>
+        public void WireCameras(CinemachineCamera follow, CinemachineCamera arena,
+            CinemachineCamera sideScroll, CinemachineCamera sports,
+            CinemachineCamera splitZone, CinemachineImpulseSource impulse)
+        {
+            followCamera = follow;
+            arenaCamera = arena;
+            sideScrollCamera = sideScroll;
+            sportsCamera = sports;
+            splitZoneCamera = splitZone;
+            impulseSource = impulse;
+            SetCameraMode(currentMode);
+        }
+
+        #endregion
+
         #region Helpers
 
         private CinemachineCamera GetCameraForMode(CameraMode mode)
