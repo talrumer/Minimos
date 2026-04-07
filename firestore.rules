@@ -1,0 +1,170 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ========================================
+    // 🔐 USERS
+    // ========================================
+    match /users/{userId} {
+      // Anyone authenticated can read any user's public profile
+      allow read: if request.auth != null;
+
+      // Users can only create their own profile
+      allow create: if request.auth != null
+                    && request.auth.uid == userId
+                    && request.resource.data.keys().hasAll(['displayName', 'level', 'xp', 'coins', 'createdAt', 'lastOnline', 'totalGamesPlayed', 'totalWins'])
+                    && request.resource.data.level == 1
+                    && request.resource.data.xp == 0
+                    && request.resource.data.coins == 0
+                    && request.resource.data.totalGamesPlayed == 0
+                    && request.resource.data.totalWins == 0;
+
+      // Users can only update their own profile
+      // Cannot set coins/xp to arbitrary values (must increment)
+      allow update: if request.auth != null
+                    && request.auth.uid == userId
+                    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['createdAt']))
+                    // Coins can only go up or stay same (no client-side stealing)
+                    && request.resource.data.coins >= resource.data.coins
+                    // XP can only go up or stay same
+                    && request.resource.data.xp >= resource.data.xp
+                    // Level can only go up or stay same
+                    && request.resource.data.level >= resource.data.level
+                    // Games played can only go up
+                    && request.resource.data.totalGamesPlayed >= resource.data.totalGamesPlayed
+                    // Wins can only go up
+                    && request.resource.data.totalWins >= resource.data.totalWins;
+
+      // Users cannot delete their profile (admin only)
+      allow delete: if false;
+
+      // ---- User Inventory (cosmetics) ----
+      match /inventory/{itemId} {
+        // Anyone authenticated can read (to see other players' equipped items)
+        allow read: if request.auth != null;
+
+        // Users can only write to their own inventory
+        allow create, update: if request.auth != null
+                              && request.auth.uid == userId
+                              && request.resource.data.keys().hasAll(['itemType', 'itemName', 'equippedSlot', 'acquiredAt'])
+                              && request.resource.data.itemType in ['hat', 'face', 'back', 'shoes', 'pattern', 'emote', 'victoryEffect', 'soundEffect'];
+
+        // Users can delete from their own inventory (unequip)
+        allow delete: if request.auth != null
+                      && request.auth.uid == userId;
+      }
+    }
+
+    // ========================================
+    // 👥 FRIENDS
+    // ========================================
+    match /users/{userId}/friends/{friendId} {
+      // Only the user can read their own friends list (privacy)
+      allow read: if request.auth != null
+                  && request.auth.uid == userId;
+
+      // Either user in the friendship can create the request
+      allow create: if request.auth != null
+                    && (request.auth.uid == userId || request.auth.uid == friendId)
+                    && request.resource.data.status in ['pending', 'accepted', 'blocked'];
+
+      // Either user can update (accept/block)
+      allow update: if request.auth != null
+                    && (request.auth.uid == userId || request.auth.uid == friendId)
+                    && request.resource.data.status in ['pending', 'accepted', 'blocked'];
+
+      // Either user can delete (unfriend)
+      allow delete: if request.auth != null
+                    && (request.auth.uid == userId || request.auth.uid == friendId);
+    }
+
+    // ========================================
+    // 🏟️ LOBBIES
+    // ========================================
+    match /lobbies/{lobbyId} {
+      // Anyone authenticated can read lobbies (for browsing)
+      allow read: if request.auth != null;
+
+      // Anyone authenticated can create a lobby (they become host)
+      allow create: if request.auth != null
+                    && request.resource.data.hostId == request.auth.uid
+                    && request.resource.data.status == 'waiting'
+                    && request.resource.data.currentPlayers >= 1
+                    && request.resource.data.maxPlayers <= 12;
+
+      // Only the host can update lobby settings
+      allow update: if request.auth != null
+                    && resource.data.hostId == request.auth.uid;
+
+      // Only the host can delete the lobby
+      allow delete: if request.auth != null
+                    && resource.data.hostId == request.auth.uid;
+
+      // ---- Lobby Players ----
+      match /players/{playerId} {
+        // Anyone in the lobby can read player list
+        allow read: if request.auth != null;
+
+        // Players can add themselves to a lobby
+        allow create: if request.auth != null
+                      && request.auth.uid == playerId;
+
+        // Players can update their own entry (ready up, change team)
+        allow update: if request.auth != null
+                      && (request.auth.uid == playerId
+                          // Host can also update any player (for team assignment)
+                          || request.auth.uid == get(/databases/$(database)/documents/lobbies/$(lobbyId)).data.hostId);
+
+        // Players can remove themselves, or host can kick
+        allow delete: if request.auth != null
+                      && (request.auth.uid == playerId
+                          || request.auth.uid == get(/databases/$(database)/documents/lobbies/$(lobbyId)).data.hostId);
+      }
+    }
+
+    // ========================================
+    // 🏆 LEADERBOARDS
+    // ========================================
+    match /leaderboards/{season}/entries/{userId} {
+      // Anyone can read leaderboards
+      allow read: if request.auth != null;
+
+      // Users can only update their own entry
+      allow create: if request.auth != null
+                    && request.auth.uid == userId;
+
+      // Scores can only go up (no manipulation)
+      allow update: if request.auth != null
+                    && request.auth.uid == userId
+                    && request.resource.data.totalPoints >= resource.data.totalPoints
+                    && request.resource.data.gamesPlayed >= resource.data.gamesPlayed;
+
+      // No deleting leaderboard entries
+      allow delete: if false;
+    }
+
+    // ========================================
+    // 📜 MATCH HISTORY
+    // ========================================
+    match /matchHistory/{matchId} {
+      // Anyone authenticated can read match history
+      allow read: if request.auth != null;
+
+      // Only the host (first player in playerIds) can create a match record
+      allow create: if request.auth != null
+                    && request.auth.uid in request.resource.data.playerIds;
+
+      // Match history is write-once (no edits)
+      allow update: if false;
+
+      // No deleting match history
+      allow delete: if false;
+    }
+
+    // ========================================
+    // 🚫 DEFAULT DENY
+    // ========================================
+    // Anything not explicitly allowed above is denied
+  }
+}
