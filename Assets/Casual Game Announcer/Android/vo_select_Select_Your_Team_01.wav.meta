@@ -1,0 +1,29 @@
+fileFormatVersion: 2
+guid: 0b0876e73295e45409e50b15f052740c
+AudioImporter:
+  externalObjects: {}
+  serializedVersion: 6
+  defaultSettings:
+    loadType: 0
+    sampleRateSetting: 0
+    sampleRateOverride: 44100
+    compressionFormat: 1
+    quality: 1
+    conversionMode: 0
+  platformSettingOverrides: {}
+  forceToMono: 0
+  normalize: 1
+  preloadAudioData: 1
+  loadInBackground: 0
+  ambisonic: 0
+  3D: 1
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 206024
+  packageName: "Voice Pack \u2502 Casual Game Announcer"
+  packageVersion: 1.0
+  assetPath: Assets/Casual Game Announcer/Android/vo_select_Select_Your_Team_01.wav
+  uploadId: 460516

@@ -299,14 +299,18 @@ namespace Minimos.Match
             voteOptions = MiniGameSelector.GetVoteOptions(available, 3);
             clientVotes.Clear();
 
-            PresentVoteOptionsClientRpc(
-                voteOptions.Select(v => v.GameName).ToArray());
+            // Netcode can't serialize string[] — send count + individual names
+            int count = voteOptions.Count;
+            string name0 = count > 0 ? voteOptions[0].GameName : "";
+            string name1 = count > 1 ? voteOptions[1].GameName : "";
+            string name2 = count > 2 ? voteOptions[2].GameName : "";
+            PresentVoteOptionsClientRpc(count, name0, name1, name2);
         }
 
         [ClientRpc]
-        private void PresentVoteOptionsClientRpc(string[] optionNames)
+        private void PresentVoteOptionsClientRpc(int count, string name0, string name1, string name2)
         {
-            // Client-side: match names back to configs for UI display
+            // Client-side: fire event so UI can display vote options
             OnVoteOptionsPresented?.Invoke(voteOptions);
         }
 

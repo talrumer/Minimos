@@ -1,0 +1,29 @@
+fileFormatVersion: 2
+guid: b0b4f2f6eadac434b8b4a9f68d1138dc
+AudioImporter:
+  externalObjects: {}
+  serializedVersion: 6
+  defaultSettings:
+    loadType: 0
+    sampleRateSetting: 0
+    sampleRateOverride: 44100
+    compressionFormat: 1
+    quality: 1
+    conversionMode: 0
+  platformSettingOverrides: {}
+  forceToMono: 0
+  normalize: 1
+  preloadAudioData: 1
+  loadInBackground: 0
+  ambisonic: 0
+  3D: 1
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 206024
+  packageName: "Voice Pack \u2502 Casual Game Announcer"
+  packageVersion: 1.0
+  assetPath: Assets/Casual Game Announcer/Android/vo_action_Run.wav
+  uploadId: 460516

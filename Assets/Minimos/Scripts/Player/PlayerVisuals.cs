@@ -70,9 +70,9 @@ namespace Minimos.Player
         private void LateUpdate()
         {
             // Billboard the nameplate toward camera
-            if (nameplateAnchor != null && Camera.main != null)
+            if (nameplateAnchor != null && UnityEngine.Camera.main != null)
             {
-                nameplateAnchor.rotation = Camera.main.transform.rotation;
+                nameplateAnchor.rotation = UnityEngine.Camera.main.transform.rotation;
             }
         }
 

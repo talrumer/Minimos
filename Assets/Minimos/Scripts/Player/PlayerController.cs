@@ -241,10 +241,10 @@ namespace Minimos.Player
             Vector3 inputDirection = new Vector3(moveInput.x, 0f, moveInput.y).normalized;
 
             // Camera-relative movement
-            if (Camera.main != null)
+            if (UnityEngine.Camera.main != null)
             {
-                Vector3 camForward = Camera.main.transform.forward;
-                Vector3 camRight = Camera.main.transform.right;
+                Vector3 camForward = UnityEngine.Camera.main.transform.forward;
+                Vector3 camRight = UnityEngine.Camera.main.transform.right;
                 camForward.y = 0f;
                 camRight.y = 0f;
                 camForward.Normalize();

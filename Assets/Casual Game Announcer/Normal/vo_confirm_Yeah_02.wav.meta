@@ -1,0 +1,29 @@
+fileFormatVersion: 2
+guid: 2bc00a4eb63f6a140877e0434b37cbdd
+AudioImporter:
+  externalObjects: {}
+  serializedVersion: 6
+  defaultSettings:
+    loadType: 0
+    sampleRateSetting: 0
+    sampleRateOverride: 44100
+    compressionFormat: 1
+    quality: 1
+    conversionMode: 0
+  platformSettingOverrides: {}
+  forceToMono: 0
+  normalize: 1
+  preloadAudioData: 1
+  loadInBackground: 0
+  ambisonic: 0
+  3D: 1
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 206024
+  packageName: "Voice Pack \u2502 Casual Game Announcer"
+  packageVersion: 1.0
+  assetPath: Assets/Casual Game Announcer/Normal/vo_confirm_Yeah_02.wav
+  uploadId: 460516

@@ -3,11 +3,9 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Minimos.Core;
 using Unity.Netcode;
-using Unity.Netcode.Transports.UTP;
 using Unity.Services.Authentication;
 using Unity.Services.Core;
-using Unity.Services.Relay;
-using Unity.Services.Relay.Models;
+using Unity.Services.Multiplayer;
 using UnityEngine;
 
 namespace Minimos.Networking
@@ -32,8 +30,9 @@ namespace Minimos.Networking
     }
 
     /// <summary>
-    /// Singleton that wraps Unity's NetworkManager with Relay-based P2P hosting.
-    /// Manages connected player tracking, host/client lifecycle, and host migration events.
+    /// Singleton that manages multiplayer sessions using Unity's Multiplayer Services SDK (Sessions API).
+    /// Replaces the old Relay + Lobby separate packages with a unified approach.
+    /// Handles session creation, joining, leaving, querying, and player tracking.
     /// </summary>
     public class NetworkGameManager : Singleton<NetworkGameManager>
     {
@@ -42,6 +41,10 @@ namespace Minimos.Networking
         /// <summary>Maximum players allowed in a single session.</summary>
         public const int MaxPlayers = 12;
 
+        private const string PlayerNamePropertyKey = "playerName";
+        private const string TeamIndexPropertyKey = "teamIndex";
+        private const string ReadyPropertyKey = "isReady";
+
         #endregion
 
         #region Fields
@@ -49,29 +52,41 @@ namespace Minimos.Networking
         [Header("References")]
         [SerializeField] private NetworkManager networkManager;
 
+        private ISession activeSession;
         private readonly Dictionary<ulong, PlayerNetworkData> connectedPlayers = new();
-        private string currentJoinCode;
         private bool servicesInitialized;
 
         #endregion
 
         #region Properties
 
+        /// <summary>The active multiplayer session, or null.</summary>
+        public ISession ActiveSession => activeSession;
+
         /// <summary>Read-only view of all connected players keyed by client ID.</summary>
         public IReadOnlyDictionary<ulong, PlayerNetworkData> ConnectedPlayers => connectedPlayers;
 
-        /// <summary>The current Relay join code, if hosting. Null otherwise.</summary>
-        public string CurrentJoinCode => currentJoinCode;
+        /// <summary>The session join code, or null if not in a session.</summary>
+        public string JoinCode => activeSession?.Code;
 
-        /// <summary>Whether this instance is the host.</summary>
-        public bool IsHost => networkManager != null && networkManager.IsHost;
+        /// <summary>Whether this instance is the session host.</summary>
+        public bool IsHost => activeSession?.IsHost ?? false;
 
-        /// <summary>Whether we are connected as a client (including host-client).</summary>
+        /// <summary>Whether we are connected to a session.</summary>
         public bool IsConnected => networkManager != null && networkManager.IsConnectedClient;
+
+        /// <summary>Whether we are in an active session.</summary>
+        public bool IsInSession => activeSession != null;
 
         #endregion
 
         #region Events
+
+        /// <summary>Fired when a session is created or joined.</summary>
+        public event Action<ISession> OnSessionStarted;
+
+        /// <summary>Fired when we leave a session.</summary>
+        public event Action OnSessionLeft;
 
         /// <summary>Fired when a new player connects. Passes their client ID.</summary>
         public event Action<ulong> OnPlayerConnected;
@@ -82,7 +97,7 @@ namespace Minimos.Networking
         /// <summary>Fired when all connected players have set IsReady to true.</summary>
         public event Action OnAllPlayersReady;
 
-        /// <summary>Fired when the host disconnects unexpectedly (for migration handling).</summary>
+        /// <summary>Fired when the host disconnects unexpectedly.</summary>
         public event Action OnHostDisconnected;
 
         #endregion
@@ -120,8 +135,8 @@ namespace Minimos.Networking
         #region Initialization
 
         /// <summary>
-        /// Initializes Unity Gaming Services (Authentication, Relay).
-        /// Must be called before any networking operation.
+        /// Initializes Unity Gaming Services (Authentication).
+        /// Must be called before any session operation.
         /// </summary>
         public async Task InitializeServices()
         {
@@ -134,6 +149,7 @@ namespace Minimos.Networking
                 if (!AuthenticationService.Instance.IsSignedIn)
                 {
                     await AuthenticationService.Instance.SignInAnonymouslyAsync();
+                    Debug.Log($"[NetworkGameManager] Signed in. PlayerId: {AuthenticationService.Instance.PlayerId}");
                 }
 
                 servicesInitialized = true;
@@ -148,144 +164,211 @@ namespace Minimos.Networking
 
         #endregion
 
-        #region Relay
+        #region Session Creation
 
         /// <summary>
-        /// Allocates a Relay server and configures the transport for hosting.
+        /// Creates a new session as host using Relay networking.
+        /// The Sessions API handles Relay allocation + lobby creation automatically.
         /// </summary>
-        /// <param name="maxPlayers">Max connections (clamped to <see cref="MaxPlayers"/>).</param>
-        /// <returns>The Relay join code that clients use to connect.</returns>
-        public async Task<string> AllocateRelay(int maxPlayers)
-        {
-            await EnsureServicesInitialized();
-
-            int clampedMax = Mathf.Clamp(maxPlayers, 1, MaxPlayers);
-
-            try
-            {
-                Allocation allocation = await RelayService.Instance.CreateAllocationAsync(clampedMax);
-                currentJoinCode = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
-
-                var transport = networkManager.GetComponent<UnityTransport>();
-                if (transport == null)
-                {
-                    Debug.LogError("[NetworkGameManager] UnityTransport component not found on NetworkManager.");
-                    return null;
-                }
-
-                transport.SetRelayServerData(
-                    allocation.RelayServer.IpV4,
-                    (ushort)allocation.RelayServer.Port,
-                    allocation.AllocationIdBytes,
-                    allocation.Key,
-                    allocation.ConnectionData
-                );
-
-                Debug.Log($"[NetworkGameManager] Relay allocated. Join code: {currentJoinCode}");
-                return currentJoinCode;
-            }
-            catch (Exception e)
-            {
-                Debug.LogError($"[NetworkGameManager] AllocateRelay failed: {e.Message}");
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// Joins an existing Relay allocation using a join code and configures the transport.
-        /// </summary>
-        /// <param name="joinCode">The join code obtained from the host.</param>
-        public async Task JoinRelay(string joinCode)
+        /// <param name="maxPlayers">Max players for this session (clamped to 12).</param>
+        /// <param name="isPrivate">If true, session won't appear in public queries.</param>
+        /// <param name="sessionName">Optional display name for the session.</param>
+        /// <returns>The session join code.</returns>
+        public async Task<string> CreateSession(int maxPlayers = MaxPlayers, bool isPrivate = false, string sessionName = null)
         {
             await EnsureServicesInitialized();
 
             try
             {
-                JoinAllocation joinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode);
+                int clamped = Mathf.Clamp(maxPlayers, 2, MaxPlayers);
 
-                var transport = networkManager.GetComponent<UnityTransport>();
-                if (transport == null)
+                var playerName = await GetPlayerName();
+                var playerProperties = new Dictionary<string, PlayerProperty>
                 {
-                    Debug.LogError("[NetworkGameManager] UnityTransport component not found on NetworkManager.");
-                    return;
-                }
+                    [PlayerNamePropertyKey] = new PlayerProperty(playerName, VisibilityPropertyOptions.Member)
+                };
 
-                transport.SetRelayServerData(
-                    joinAllocation.RelayServer.IpV4,
-                    (ushort)joinAllocation.RelayServer.Port,
-                    joinAllocation.AllocationIdBytes,
-                    joinAllocation.Key,
-                    joinAllocation.ConnectionData,
-                    joinAllocation.HostConnectionData
-                );
+                var options = new SessionOptions
+                {
+                    MaxPlayers = clamped,
+                    IsLocked = false,
+                    IsPrivate = isPrivate,
+                    Name = sessionName ?? $"Minimos_{playerName}",
+                    PlayerProperties = playerProperties
+                }.WithRelayNetwork();
 
-                Debug.Log($"[NetworkGameManager] Joined Relay with code: {joinCode}");
+                connectedPlayers.Clear();
+                activeSession = await MultiplayerService.Instance.CreateSessionAsync(options);
+
+                Debug.Log($"[NetworkGameManager] Session created! Id: {activeSession.Id} | Code: {activeSession.Code} | Max: {clamped}");
+                OnSessionStarted?.Invoke(activeSession);
+
+                return activeSession.Code;
             }
             catch (Exception e)
             {
-                Debug.LogError($"[NetworkGameManager] JoinRelay failed: {e.Message}");
+                Debug.LogError($"[NetworkGameManager] CreateSession failed: {e.Message}");
                 throw;
             }
         }
 
         #endregion
 
-        #region Host / Client
+        #region Join Session
 
         /// <summary>
-        /// Starts as host: allocates Relay and starts the NetworkManager as host.
+        /// Joins an existing session using a join code.
         /// </summary>
-        /// <param name="maxPlayers">Max players for this session.</param>
-        /// <returns>The Relay join code.</returns>
-        public async Task<string> StartHost(int maxPlayers = MaxPlayers)
+        /// <param name="joinCode">The session code shared by the host.</param>
+        public async Task JoinSessionByCode(string joinCode)
         {
-            string joinCode = await AllocateRelay(maxPlayers);
-            connectedPlayers.Clear();
+            await EnsureServicesInitialized();
 
-            bool success = networkManager.StartHost();
-            if (!success)
+            try
             {
-                Debug.LogError("[NetworkGameManager] NetworkManager.StartHost() failed.");
-                return null;
+                var playerName = await GetPlayerName();
+                var playerProperties = new Dictionary<string, PlayerProperty>
+                {
+                    [PlayerNamePropertyKey] = new PlayerProperty(playerName, VisibilityPropertyOptions.Member)
+                };
+
+                connectedPlayers.Clear();
+                activeSession = await MultiplayerService.Instance.JoinSessionByCodeAsync(joinCode);
+
+                Debug.Log($"[NetworkGameManager] Joined session by code: {joinCode} | Id: {activeSession.Id}");
+                OnSessionStarted?.Invoke(activeSession);
             }
-
-            Debug.Log("[NetworkGameManager] Host started.");
-            return joinCode;
-        }
-
-        /// <summary>
-        /// Starts as client: joins a Relay allocation and starts the NetworkManager as client.
-        /// </summary>
-        /// <param name="joinCode">The host's Relay join code.</param>
-        public async Task StartClient(string joinCode)
-        {
-            await JoinRelay(joinCode);
-            connectedPlayers.Clear();
-
-            bool success = networkManager.StartClient();
-            if (!success)
+            catch (Exception e)
             {
-                Debug.LogError("[NetworkGameManager] NetworkManager.StartClient() failed.");
-            }
-            else
-            {
-                Debug.Log("[NetworkGameManager] Client started.");
+                Debug.LogError($"[NetworkGameManager] JoinSessionByCode failed: {e.Message}");
+                throw;
             }
         }
 
         /// <summary>
-        /// Disconnects from the current session and shuts down networking.
+        /// Joins a session by its unique ID.
         /// </summary>
-        public void Disconnect()
+        /// <param name="sessionId">The session ID from a query result.</param>
+        public async Task JoinSessionById(string sessionId)
         {
-            if (networkManager.IsHost || networkManager.IsClient)
+            await EnsureServicesInitialized();
+
+            try
+            {
+                connectedPlayers.Clear();
+                activeSession = await MultiplayerService.Instance.JoinSessionByIdAsync(sessionId);
+
+                Debug.Log($"[NetworkGameManager] Joined session by ID: {sessionId}");
+                OnSessionStarted?.Invoke(activeSession);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[NetworkGameManager] JoinSessionById failed: {e.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Quick-joins any available public session.
+        /// </summary>
+        public async Task QuickJoinSession()
+        {
+            await EnsureServicesInitialized();
+
+            try
+            {
+                connectedPlayers.Clear();
+                var options = new QuickJoinSessionOptions();
+                activeSession = await MultiplayerService.Instance.QuickJoinSessionAsync(options);
+
+                Debug.Log($"[NetworkGameManager] Quick-joined session: {activeSession.Id} | Code: {activeSession.Code}");
+                OnSessionStarted?.Invoke(activeSession);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[NetworkGameManager] QuickJoinSession failed: {e.Message}");
+                throw;
+            }
+        }
+
+        #endregion
+
+        #region Query Sessions
+
+        /// <summary>
+        /// Queries for available public sessions (for session browser).
+        /// </summary>
+        /// <returns>List of session info for display.</returns>
+        public async Task<IList<ISessionInfo>> QuerySessions()
+        {
+            await EnsureServicesInitialized();
+
+            try
+            {
+                var queryOptions = new QuerySessionsOptions();
+                QuerySessionsResults results = await MultiplayerService.Instance.QuerySessionsAsync(queryOptions);
+                Debug.Log($"[NetworkGameManager] Found {results.Sessions.Count} sessions.");
+                return results.Sessions;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[NetworkGameManager] QuerySessions failed: {e.Message}");
+                throw;
+            }
+        }
+
+        #endregion
+
+        #region Leave / Disconnect
+
+        /// <summary>
+        /// Leaves the current session and shuts down networking.
+        /// </summary>
+        public async Task LeaveSession()
+        {
+            if (activeSession != null)
+            {
+                try
+                {
+                    await activeSession.LeaveAsync();
+                    Debug.Log("[NetworkGameManager] Left session.");
+                }
+                catch (Exception e)
+                {
+                    Debug.LogWarning($"[NetworkGameManager] LeaveSession error (may already be disconnected): {e.Message}");
+                }
+                finally
+                {
+                    activeSession = null;
+                    connectedPlayers.Clear();
+                    OnSessionLeft?.Invoke();
+                }
+            }
+
+            // Also shut down Netcode if still running
+            if (networkManager != null && (networkManager.IsHost || networkManager.IsClient))
             {
                 networkManager.Shutdown();
             }
+        }
 
-            connectedPlayers.Clear();
-            currentJoinCode = null;
-            Debug.Log("[NetworkGameManager] Disconnected.");
+        /// <summary>
+        /// Host only: kicks a player from the session.
+        /// </summary>
+        /// <param name="playerId">The UGS player ID to remove.</param>
+        public async Task KickPlayer(string playerId)
+        {
+            if (!IsHost || activeSession == null) return;
+
+            try
+            {
+                await activeSession.AsHost().RemovePlayerAsync(playerId);
+                Debug.Log($"[NetworkGameManager] Kicked player: {playerId}");
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[NetworkGameManager] KickPlayer failed: {e.Message}");
+            }
         }
 
         #endregion
@@ -294,10 +377,8 @@ namespace Minimos.Networking
 
         /// <summary>
         /// Updates the network data for a connected player.
-        /// Fires <see cref="OnAllPlayersReady"/> if all players are now ready.
+        /// Fires OnAllPlayersReady if all players are now ready.
         /// </summary>
-        /// <param name="clientId">The client ID to update.</param>
-        /// <param name="data">Updated player data.</param>
         public void UpdatePlayerData(ulong clientId, PlayerNetworkData data)
         {
             connectedPlayers[clientId] = data;
@@ -307,8 +388,6 @@ namespace Minimos.Networking
         /// <summary>
         /// Sets the ready state for a specific player.
         /// </summary>
-        /// <param name="clientId">Target client ID.</param>
-        /// <param name="isReady">Ready state.</param>
         public void SetPlayerReady(ulong clientId, bool isReady)
         {
             if (connectedPlayers.TryGetValue(clientId, out var data))
@@ -346,7 +425,7 @@ namespace Minimos.Networking
             Debug.Log($"[NetworkGameManager] Player disconnected: {clientId}");
             OnPlayerDisconnected?.Invoke(clientId);
 
-            // Detect host disconnection on client side.
+            // Detect host disconnection on client side
             if (!IsHost && clientId == NetworkManager.ServerClientId)
             {
                 Debug.LogWarning("[NetworkGameManager] Host disconnected!");
@@ -363,6 +442,18 @@ namespace Minimos.Networking
             if (!servicesInitialized)
             {
                 await InitializeServices();
+            }
+        }
+
+        private async Task<string> GetPlayerName()
+        {
+            try
+            {
+                return await AuthenticationService.Instance.GetPlayerNameAsync();
+            }
+            catch
+            {
+                return $"Player_{UnityEngine.Random.Range(1000, 9999)}";
             }
         }
 

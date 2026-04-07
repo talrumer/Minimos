@@ -86,3 +86,9 @@ docs/superpowers/
 **/google-services.json
 **/GoogleService-Info.plist
 FirebaseConfigurationFiles/
+
+# Firebase SDK large binaries (too big for GitHub, install via Unity package)
+Assets/Firebase/Plugins/**/*.bundle
+Assets/Firebase/Plugins/**/*.so
+Assets/Firebase/Plugins/**/*.dll
+Assets/Firebase/

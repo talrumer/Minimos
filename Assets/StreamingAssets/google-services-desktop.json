@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "588884946642",
+    "project_id": "minimos-3d",
+    "storage_bucket": "minimos-3d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:588884946642:android:c8bff1d0242802a828470b",
+        "android_client_info": {
+          "package_name": "com.pexon.minimos"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBpY9lIaSSlXTffhdYqijNUlGDvw46Nd9g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

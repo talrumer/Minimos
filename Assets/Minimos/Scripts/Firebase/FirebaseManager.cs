@@ -149,6 +149,9 @@ namespace Minimos.Firebase
         /// <summary>The current user ID, or null.</summary>
         public string CurrentUserId => service.GetCurrentUserId();
 
+        /// <summary>Returns the underlying Firebase service for direct calls.</summary>
+        public IFirebaseService GetService() => service;
+
         #endregion
 
         #region Profile

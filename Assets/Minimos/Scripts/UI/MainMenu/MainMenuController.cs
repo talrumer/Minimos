@@ -141,15 +141,15 @@ namespace Minimos.UI
         private async void LoadPlayerProfile()
         {
             // Attempt to load from Firebase; fall back to defaults.
-            var firebase = FindAnyObjectByType<Firebase.MockFirebaseService>();
-            if (firebase == null || !firebase.IsSignedIn())
+            var firebaseManager = Minimos.Firebase.FirebaseManager.Instance;
+            if (firebaseManager == null || !firebaseManager.IsSignedIn)
             {
                 SetProfileDisplay("Player", 1, 0);
                 return;
             }
 
-            string userId = firebase.GetCurrentUserId();
-            var profile = await firebase.GetPlayerProfile(userId);
+            string userId = firebaseManager.CurrentUserId;
+            var profile = await firebaseManager.GetService().GetPlayerProfile(userId);
 
             if (profile != null)
             {

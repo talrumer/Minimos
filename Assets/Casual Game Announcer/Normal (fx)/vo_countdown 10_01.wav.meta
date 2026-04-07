@@ -1,0 +1,29 @@
+fileFormatVersion: 2
+guid: 5412d9f7a26b07040b25580a3e6d3ccb
+AudioImporter:
+  externalObjects: {}
+  serializedVersion: 6
+  defaultSettings:
+    loadType: 0
+    sampleRateSetting: 0
+    sampleRateOverride: 44100
+    compressionFormat: 1
+    quality: 1
+    conversionMode: 0
+  platformSettingOverrides: {}
+  forceToMono: 0
+  normalize: 1
+  preloadAudioData: 1
+  loadInBackground: 0
+  ambisonic: 0
+  3D: 1
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 206024
+  packageName: "Voice Pack \u2502 Casual Game Announcer"
+  packageVersion: 1.0
+  assetPath: Assets/Casual Game Announcer/Normal (fx)/vo_countdown 10_01.wav
+  uploadId: 460516
