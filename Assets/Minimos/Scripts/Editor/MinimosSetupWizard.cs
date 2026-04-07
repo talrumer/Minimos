@@ -41,12 +41,13 @@ namespace Minimos.Editor
 
             Debug.Log("✅ [Minimos Setup] Full setup complete! Check Assets/Minimos/Data/ and Assets/Minimos/Prefabs/");
             EditorUtility.DisplayDialog("Minimos Setup Complete",
-                "All ScriptableObjects, prefabs, and the GameBootstrap have been created.\n\n" +
-                "Next steps:\n" +
-                "1. Place GameBootstrap prefab in your SplashScreen scene\n" +
-                "2. Add MinimoPlayer prefab to NetworkManager's Network Prefabs list\n" +
-                "3. Add Projectile prefab to NetworkManager's Network Prefabs list\n" +
-                "4. Populate audio libraries with clips from imported asset packs",
+                "All ScriptableObjects, prefabs, and GameBootstrap have been created.\n\n" +
+                "✅ GameBootstrap placed in the current scene (all references wired)\n" +
+                "✅ MinimoPlayer + Projectile prefabs created\n" +
+                "✅ Network prefabs auto-registered\n\n" +
+                "⚠️ IMPORTANT: Open the SplashScreen scene FIRST, then run this wizard.\n" +
+                "Save the scene (Ctrl+S / Cmd+S) to persist the GameBootstrap.\n\n" +
+                "Optional: Populate audio libraries with clips from imported asset packs.",
                 "Got it!");
         }
 
@@ -215,127 +216,126 @@ namespace Minimos.Editor
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        // --- Step 4a: GameBootstrap Prefab ---
+        // --- Step 4a: GameBootstrap (placed in current scene) ---
 
-        [MenuItem("Minimos/Setup Wizard/Create GameBootstrap Prefab", false, 200)]
+        [MenuItem("Minimos/Setup Wizard/Create GameBootstrap in Scene", false, 200)]
         public static void CreateGameBootstrap()
         {
-            string prefabDir = $"{PrefabPath}/Network";
-            EnsureDirectory(prefabDir);
-
-            string prefabAssetPath = $"{prefabDir}/GameBootstrap.prefab";
-            if (AssetExists(prefabAssetPath))
+            // Check if GameBootstrap already exists in the scene
+            var existing = GameObject.Find("GameBootstrap");
+            if (existing != null)
             {
-                Debug.Log("📝 [Minimos Setup] GameBootstrap prefab already exists. Skipping.");
+                Debug.Log("📝 [Minimos Setup] GameBootstrap already exists in scene. Skipping.");
                 return;
             }
 
-            // 1) Build the GameObject in memory with all components
+            // Create the GameObject directly in the current scene
+            // This avoids prefab self-reference issues (transport ↔ NetworkManager on same object)
             var go = new GameObject("GameBootstrap");
+            Undo.RegisterCreatedObjectUndo(go, "Create GameBootstrap");
 
-            // Unity's NetworkManager + Transport (required by Netcode)
+            // Unity's NetworkManager + Transport
             var netManager = go.AddComponent<Unity.Netcode.NetworkManager>();
             var transport = go.AddComponent<Unity.Netcode.Transports.UTP.UnityTransport>();
-            netManager.NetworkConfig = new Unity.Netcode.NetworkConfig();
 
-            // Use SerializedObject to set the NetworkTransport reference
-            // (NetworkConfig.NetworkTransport is internal, but the inspector field is accessible)
-            var serializedNetManager = new SerializedObject(netManager);
-            var transportProp = serializedNetManager.FindProperty("NetworkTransport");
+            // Wire transport → NetworkManager (works on scene objects!)
+            var soNet = new SerializedObject(netManager);
+            var transportProp = soNet.FindProperty("NetworkConfig.NetworkTransport");
             if (transportProp != null)
             {
                 transportProp.objectReferenceValue = transport;
-                serializedNetManager.ApplyModifiedPropertiesWithoutUndo();
+                soNet.ApplyModifiedPropertiesWithoutUndo();
+            }
+            else
+            {
+                Debug.LogWarning("⚠️ [Minimos Setup] Could not find 'NetworkConfig.NetworkTransport'. Trying fallback...");
+                // Fallback: try top-level property
+                var fallback = soNet.FindProperty("NetworkTransport");
+                if (fallback != null)
+                {
+                    fallback.objectReferenceValue = transport;
+                    soNet.ApplyModifiedPropertiesWithoutUndo();
+                }
+            }
+
+            // Wire player prefab if it exists
+            var playerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabPath}/Player/MinimoPlayer.prefab");
+            if (playerPrefab != null)
+            {
+                var playerProp = soNet.FindProperty("NetworkConfig.PlayerPrefab");
+                if (playerProp != null)
+                {
+                    playerProp.objectReferenceValue = playerPrefab;
+                    soNet.ApplyModifiedPropertiesWithoutUndo();
+                }
             }
 
             // Our managers
             go.AddComponent<Core.GameManager>();
             go.AddComponent<Core.SceneLoader>();
             go.AddComponent<Audio.AudioManager>();
-            go.AddComponent<Teams.TeamManager>();
+            var teamManager = go.AddComponent<Teams.TeamManager>();
             go.AddComponent<Minimos.UI.UIManager>();
             go.AddComponent<MinimosCamera.CameraManager>();
-            go.AddComponent<Announcer.AnnouncerManager>();
+            var announcerMgr = go.AddComponent<Announcer.AnnouncerManager>();
             go.AddComponent<Firebase.FirebaseManager>();
-            go.AddComponent<Networking.NetworkGameManager>();
 
-            // 2) Save as prefab FIRST, then destroy the scene object
-            PrefabUtility.SaveAsPrefabAsset(go, prefabAssetPath);
-            Object.DestroyImmediate(go);
-
-            // 3) Load the saved prefab asset and wire serialized references on it
-            var prefabAsset = AssetDatabase.LoadAssetAtPath<GameObject>(prefabAssetPath);
-
-            // Wire NetworkTransport on the prefab asset
-            var savedNetManager = prefabAsset.GetComponent<Unity.Netcode.NetworkManager>();
-            var savedTransport = prefabAsset.GetComponent<Unity.Netcode.Transports.UTP.UnityTransport>();
-            if (savedNetManager != null && savedTransport != null)
+            // Our NetworkGameManager — wire the networkManager reference
+            var netGameManager = go.AddComponent<Networking.NetworkGameManager>();
+            var soNetGame = new SerializedObject(netGameManager);
+            var netManagerRef = soNetGame.FindProperty("networkManager");
+            if (netManagerRef != null)
             {
-                var soNet = new SerializedObject(savedNetManager);
-                var tProp = soNet.FindProperty("NetworkTransport");
-                if (tProp != null)
-                {
-                    tProp.objectReferenceValue = savedTransport;
-                    soNet.ApplyModifiedPropertiesWithoutUndo();
-                }
-                else
-                {
-                    Debug.LogWarning("⚠️ [Minimos Setup] Could not find 'NetworkTransport' property on NetworkManager.");
-                }
+                netManagerRef.objectReferenceValue = netManager;
+                soNetGame.ApplyModifiedPropertiesWithoutUndo();
             }
 
             // Wire TeamData assets
-            var teamManager = prefabAsset.GetComponent<Teams.TeamManager>();
-            if (teamManager != null)
+            var teamAssets = new TeamData[6];
+            string[] teamNames = { "CoralRed", "SkyBlue", "MintGreen", "SunnyYellow", "PeachOrange", "LavenderPurple" };
+            for (int i = 0; i < teamNames.Length; i++)
             {
-                var teamAssets = new TeamData[6];
-                string[] teamNames = { "CoralRed", "SkyBlue", "MintGreen", "SunnyYellow", "PeachOrange", "LavenderPurple" };
-                for (int i = 0; i < teamNames.Length; i++)
-                {
-                    teamAssets[i] = AssetDatabase.LoadAssetAtPath<TeamData>($"{DataPath}/Teams/Team_{teamNames[i]}.asset");
-                }
+                teamAssets[i] = AssetDatabase.LoadAssetAtPath<TeamData>($"{DataPath}/Teams/Team_{teamNames[i]}.asset");
+            }
 
-                var serializedTeamManager = new SerializedObject(teamManager);
-                var teamDataProp = serializedTeamManager.FindProperty("teamDataAssets");
-                if (teamDataProp != null)
+            var soTeam = new SerializedObject(teamManager);
+            var teamDataProp = soTeam.FindProperty("teamDataAssets");
+            if (teamDataProp != null)
+            {
+                teamDataProp.arraySize = 6;
+                for (int i = 0; i < 6; i++)
                 {
-                    teamDataProp.arraySize = 6;
-                    for (int i = 0; i < 6; i++)
-                    {
-                        teamDataProp.GetArrayElementAtIndex(i).objectReferenceValue = teamAssets[i];
-                    }
-                    serializedTeamManager.ApplyModifiedPropertiesWithoutUndo();
+                    teamDataProp.GetArrayElementAtIndex(i).objectReferenceValue = teamAssets[i];
                 }
-                else
-                {
-                    Debug.LogWarning("⚠️ [Minimos Setup] Could not find 'teamDataAssets' property on TeamManager.");
-                }
+                soTeam.ApplyModifiedPropertiesWithoutUndo();
+            }
+            else
+            {
+                Debug.LogWarning("⚠️ [Minimos Setup] Could not find 'teamDataAssets' property on TeamManager.");
             }
 
             // Wire AnnouncerConfig
-            var announcerManager = prefabAsset.GetComponent<Announcer.AnnouncerManager>();
             var announcerConfig = AssetDatabase.LoadAssetAtPath<Announcer.AnnouncerConfig>($"{DataPath}/Audio/AnnouncerConfig.asset");
-            if (announcerManager != null && announcerConfig != null)
+            if (announcerConfig != null)
             {
-                var serializedAnnouncer = new SerializedObject(announcerManager);
-                var configProp = serializedAnnouncer.FindProperty("config");
+                var soAnnouncer = new SerializedObject(announcerMgr);
+                var configProp = soAnnouncer.FindProperty("config");
                 if (configProp != null)
                 {
                     configProp.objectReferenceValue = announcerConfig;
-                    serializedAnnouncer.ApplyModifiedPropertiesWithoutUndo();
-                }
-                else
-                {
-                    Debug.LogWarning("⚠️ [Minimos Setup] Could not find 'config' property on AnnouncerManager.");
+                    soAnnouncer.ApplyModifiedPropertiesWithoutUndo();
                 }
             }
-            else if (announcerConfig == null)
+            else
             {
-                Debug.LogWarning("⚠️ [Minimos Setup] AnnouncerConfig asset not found. Run 'Create Announcer Config' first, then re-run GameBootstrap creation.");
+                Debug.LogWarning("⚠️ [Minimos Setup] AnnouncerConfig asset not found.");
             }
 
-            AssetDatabase.SaveAssets();
-            Debug.Log("✅ [Minimos Setup] Created GameBootstrap prefab with all manager components wired.");
+            // Mark scene dirty so user is prompted to save
+            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(
+                UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene());
+
+            Debug.Log("✅ [Minimos Setup] Created GameBootstrap in current scene with all components wired. Save the scene (Ctrl+S) to persist!");
         }
 
         // --- Step 5: Player Prefab ---
