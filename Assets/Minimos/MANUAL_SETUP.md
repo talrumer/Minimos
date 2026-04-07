@@ -56,16 +56,16 @@ This automatically creates:
 - ✅ AnnouncerConfig asset
 - ✅ CTF and KOTH MiniGameConfig assets
 - ✅ 4 PowerUpConfig assets (SpeedBoost, MegaPunch, BuddyShield, FreezeBomb)
-- ✅ GameBootstrap prefab (with all manager components wired)
+- ✅ GameBootstrap prefab (with NetworkManager + UnityTransport + all manager components wired)
 - ✅ MinimoPlayer prefab (with all scripts, attachment points, team color material)
 - ✅ Projectile prefab (with NetworkObject, trail renderer)
+- ✅ Network Prefabs list (MinimoPlayer + Projectile auto-registered)
 
 > 💡 You can also run individual steps via **Minimos → Setup Wizard → ...** if needed.
 
 **After running the wizard:**
 1. Drag `Prefabs/Network/GameBootstrap` into the **SplashScreen** scene
-2. Add `Prefabs/Player/MinimoPlayer` to **NetworkManager's Network Prefabs list**
-3. Add `Prefabs/Player/Projectile` to **NetworkManager's Network Prefabs list**
+2. Populate audio libraries with clips when ready (optional for now)
 
 ---
 

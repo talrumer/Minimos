@@ -34,6 +34,7 @@ namespace Minimos.Editor
             CreateGameBootstrap();
             CreatePlayerPrefab();
             CreateProjectilePrefab();
+            RegisterNetworkPrefabs();
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -232,6 +233,22 @@ namespace Minimos.Editor
             // 1) Build the GameObject in memory with all components
             var go = new GameObject("GameBootstrap");
 
+            // Unity's NetworkManager + Transport (required by Netcode)
+            var netManager = go.AddComponent<Unity.Netcode.NetworkManager>();
+            var transport = go.AddComponent<Unity.Netcode.Transports.UTP.UnityTransport>();
+            netManager.NetworkConfig = new Unity.Netcode.NetworkConfig();
+
+            // Use SerializedObject to set the NetworkTransport reference
+            // (NetworkConfig.NetworkTransport is internal, but the inspector field is accessible)
+            var serializedNetManager = new SerializedObject(netManager);
+            var transportProp = serializedNetManager.FindProperty("NetworkTransport");
+            if (transportProp != null)
+            {
+                transportProp.objectReferenceValue = transport;
+                serializedNetManager.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            // Our managers
             go.AddComponent<Core.GameManager>();
             go.AddComponent<Core.SceneLoader>();
             go.AddComponent<Audio.AudioManager>();
@@ -442,6 +459,91 @@ namespace Minimos.Editor
             Object.DestroyImmediate(proj);
 
             Debug.Log("✅ [Minimos Setup] Created Projectile prefab.");
+        }
+
+        // --- Register Network Prefabs on NetworkManager ---
+
+        [MenuItem("Minimos/Setup Wizard/Register Network Prefabs", false, 203)]
+        public static void RegisterNetworkPrefabs()
+        {
+            string bootstrapPath = $"{PrefabPath}/Network/GameBootstrap.prefab";
+            var bootstrapPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(bootstrapPath);
+            if (bootstrapPrefab == null)
+            {
+                Debug.LogWarning("⚠️ [Minimos Setup] GameBootstrap prefab not found. Run full setup first.");
+                return;
+            }
+
+            var netManager = bootstrapPrefab.GetComponent<Unity.Netcode.NetworkManager>();
+            if (netManager == null)
+            {
+                Debug.LogWarning("⚠️ [Minimos Setup] NetworkManager component not found on GameBootstrap.");
+                return;
+            }
+
+            // Load player and projectile prefabs
+            var playerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabPath}/Player/MinimoPlayer.prefab");
+            var projectilePrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabPath}/Player/Projectile.prefab");
+
+            var so = new SerializedObject(netManager);
+            var prefabListProp = so.FindProperty("NetworkConfig.Prefabs.NetworkPrefabsLists");
+
+            // Try the direct PrefabsList approach — Netcode stores prefabs in a NetworkPrefabsList asset
+            // If the above path doesn't work, fall back to creating a NetworkPrefabsList asset
+            if (prefabListProp == null || prefabListProp.arraySize == 0)
+            {
+                // Create a NetworkPrefabsList asset and add our prefabs to it
+                var prefabsList = ScriptableObject.CreateInstance<Unity.Netcode.NetworkPrefabsList>();
+
+                if (playerPrefab != null)
+                {
+                    var playerNetObj = playerPrefab.GetComponent<Unity.Netcode.NetworkObject>();
+                    if (playerNetObj != null)
+                        prefabsList.Add(new Unity.Netcode.NetworkPrefab { Prefab = playerPrefab });
+                }
+
+                if (projectilePrefab != null)
+                {
+                    var projNetObj = projectilePrefab.GetComponent<Unity.Netcode.NetworkObject>();
+                    if (projNetObj != null)
+                        prefabsList.Add(new Unity.Netcode.NetworkPrefab { Prefab = projectilePrefab });
+                }
+
+                string prefabsListPath = $"{PrefabPath}/Network/MinimosNetworkPrefabs.asset";
+                if (!AssetExists(prefabsListPath))
+                {
+                    AssetDatabase.CreateAsset(prefabsList, prefabsListPath);
+                }
+
+                // Wire the prefabs list to the NetworkManager
+                var loadedList = AssetDatabase.LoadAssetAtPath<Unity.Netcode.NetworkPrefabsList>(prefabsListPath);
+                if (prefabListProp != null)
+                {
+                    prefabListProp.arraySize = 1;
+                    prefabListProp.GetArrayElementAtIndex(0).objectReferenceValue = loadedList;
+                    so.ApplyModifiedPropertiesWithoutUndo();
+                }
+                else
+                {
+                    // Fallback: try the older NetworkPrefabs list format
+                    var oldPrefabsProp = so.FindProperty("NetworkConfig.NetworkPrefabs");
+                    if (oldPrefabsProp != null)
+                    {
+                        Debug.Log("📝 [Minimos Setup] Using legacy NetworkPrefabs format.");
+                    }
+                    else
+                    {
+                        Debug.LogWarning("⚠️ [Minimos Setup] Could not find Network Prefabs property on NetworkManager. You may need to add MinimoPlayer and Projectile prefabs manually via the Inspector.");
+                    }
+                }
+
+                AssetDatabase.SaveAssets();
+            }
+
+            int count = 0;
+            if (playerPrefab != null) count++;
+            if (projectilePrefab != null) count++;
+            Debug.Log($"✅ [Minimos Setup] Registered {count} network prefab(s) (MinimoPlayer, Projectile).");
         }
 
         // =============================================
