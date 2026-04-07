@@ -266,6 +266,24 @@ namespace Minimos.Editor
             // 3) Load the saved prefab asset and wire serialized references on it
             var prefabAsset = AssetDatabase.LoadAssetAtPath<GameObject>(prefabAssetPath);
 
+            // Wire NetworkTransport on the prefab asset
+            var savedNetManager = prefabAsset.GetComponent<Unity.Netcode.NetworkManager>();
+            var savedTransport = prefabAsset.GetComponent<Unity.Netcode.Transports.UTP.UnityTransport>();
+            if (savedNetManager != null && savedTransport != null)
+            {
+                var soNet = new SerializedObject(savedNetManager);
+                var tProp = soNet.FindProperty("NetworkTransport");
+                if (tProp != null)
+                {
+                    tProp.objectReferenceValue = savedTransport;
+                    soNet.ApplyModifiedPropertiesWithoutUndo();
+                }
+                else
+                {
+                    Debug.LogWarning("⚠️ [Minimos Setup] Could not find 'NetworkTransport' property on NetworkManager.");
+                }
+            }
+
             // Wire TeamData assets
             var teamManager = prefabAsset.GetComponent<Teams.TeamManager>();
             if (teamManager != null)
