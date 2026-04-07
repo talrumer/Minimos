@@ -534,7 +534,7 @@ namespace Minimos.Editor
                 var followCam = CreateCinemachineCamera("CM_FollowCam", cameraRig.transform);
                 var followComp = followCam.gameObject.AddComponent<CinemachineFollow>();
                 followComp.FollowOffset = new Vector3(0f, 5f, -8f);
-                followComp.Damping = new Vector3(0.5f, 0.5f, 0.5f);
+                followComp.TrackerSettings.PositionDamping = new Vector3(0.5f, 0.5f, 0.5f);
                 followCam.gameObject.AddComponent<CinemachineRotationComposer>();
                 followCam.Priority = 10;
 
@@ -546,19 +546,19 @@ namespace Minimos.Editor
                 var sideScrollCam = CreateCinemachineCamera("CM_SideScrollCam", cameraRig.transform);
                 var sideFollow = sideScrollCam.gameObject.AddComponent<CinemachineFollow>();
                 sideFollow.FollowOffset = new Vector3(0f, 3f, -15f);
-                sideFollow.Damping = new Vector3(0.3f, 0.3f, 0f);
+                sideFollow.TrackerSettings.PositionDamping = new Vector3(0.3f, 0.3f, 0f);
                 sideScrollCam.gameObject.AddComponent<CinemachineRotationComposer>();
 
                 var sportsCam = CreateCinemachineCamera("CM_SportsCam", cameraRig.transform);
                 var sportsFollow = sportsCam.gameObject.AddComponent<CinemachineFollow>();
                 sportsFollow.FollowOffset = new Vector3(0f, 12f, -18f);
-                sportsFollow.Damping = new Vector3(1f, 0.5f, 1f);
+                sportsFollow.TrackerSettings.PositionDamping = new Vector3(1f, 0.5f, 1f);
                 sportsCam.gameObject.AddComponent<CinemachineRotationComposer>();
 
                 var splitZoneCam = CreateCinemachineCamera("CM_SplitZoneCam", cameraRig.transform);
                 var splitFollow = splitZoneCam.gameObject.AddComponent<CinemachineFollow>();
                 splitFollow.FollowOffset = new Vector3(0f, 10f, -10f);
-                splitFollow.Damping = new Vector3(0.5f, 0.5f, 0.5f);
+                splitFollow.TrackerSettings.PositionDamping = new Vector3(0.5f, 0.5f, 0.5f);
                 splitZoneCam.gameObject.AddComponent<CinemachineRotationComposer>();
 
                 // Impulse on main camera
