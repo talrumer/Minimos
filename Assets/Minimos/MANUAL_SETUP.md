@@ -5,23 +5,20 @@
 
 ---
 
-## 📦 Step 1: Package Manager — Verify/Install Dependencies
+## 📦 Step 1: Verify Packages
 
-**Window → Package Manager → Unity Registry**
+**Window → Package Manager**
 
-Ensure these are installed (most should be from the template):
+These should already be installed from the template:
 - ✅ Netcode for GameObjects (2.x)
 - ✅ Unity Transport (2.x)
 - ✅ Input System (1.x)
 - ✅ Cinemachine (3.x)
+- ✅ Multiplayer Services (`com.unity.services.multiplayer`) — **this replaces Relay + Lobby**
 - ✅ TextMesh Pro
 - ✅ Visual Effect Graph
 
-Install if missing (search "Unity Registry"):
-- ⚠️ **Multiplayer Services** (`com.unity.services.multiplayer`)
-- ⚠️ **Relay** (`com.unity.services.relay`)
-- ⚠️ **Lobby** (`com.unity.services.lobby`)
-- ⚠️ **Authentication** (`com.unity.services.authentication`)
+> ❌ Do **NOT** install `com.unity.services.relay` or `com.unity.services.lobby` separately — they conflict with the Multiplayer Services SDK which already includes their functionality via the Sessions API.
 
 ---
 
@@ -71,7 +68,6 @@ Create an empty GameObject called **"GameBootstrap"** and add these components:
 - `AnnouncerManager`
 - `FirebaseManager`
 - `NetworkGameManager`
-- `LobbyManager`
 
 Save as prefab in `Assets/Minimos/Prefabs/Network/GameBootstrap.prefab`
 
@@ -82,7 +78,13 @@ Save as prefab in `Assets/Minimos/Prefabs/Network/GameBootstrap.prefab`
 1. Create 6 TeamData ScriptableObjects:
    - Right-click `Assets/Minimos/Data/Teams/` → Create → Minimos → Teams → Team Data
    - Create: CoralRed, SkyBlue, MintGreen, SunnyYellow, PeachOrange, LavenderPurple
-   - Set colors per the GDD hex values
+   - Set colors per the GDD hex values:
+     - Coral Red: `#FF6B6B`
+     - Sky Blue: `#74B9FF`
+     - Mint Green: `#55EFC4`
+     - Sunny Yellow: `#FFEAA7`
+     - Peach Orange: `#FAB1A0`
+     - Lavender Purple: `#A29BFE`
 2. Assign all 6 to `TeamManager.teamDataAssets` array
 
 ### 4c. Wire Audio
@@ -210,29 +212,30 @@ In the Gameplay scene:
 
 ## 🌐 Step 11: Unity Services Setup
 
-1. **Window → General → Services**
-2. Link to your Unity Dashboard project
-3. Enable: Relay, Lobby, Authentication
-4. In code, services auto-initialize via `UnityServices.InitializeAsync()`
+1. **Edit → Project Settings → Services** (or **Window → General → Services**)
+2. Link to your Unity Dashboard project (create one if needed)
+3. The Multiplayer Services SDK handles authentication + relay + lobby automatically via the **Sessions API**
+4. In code, services auto-initialize via `UnityServices.InitializeAsync()` + `AuthenticationService.Instance.SignInAnonymouslyAsync()`
 
 ---
 
-## 🔥 Step 12: Firebase SDK (Optional for now)
+## 🔥 Step 12: Firebase SDK (Optional — skip for now)
 
-The project works without Firebase using `MockFirebaseService`. When ready:
+The project works without Firebase using `MockFirebaseService` (local PlayerPrefs storage). When ready for real backend:
 1. Download Firebase Unity SDK from https://firebase.google.com/docs/unity/setup
 2. Import `FirebaseAuth.unitypackage` and `FirebaseFirestore.unitypackage`
 3. Add `FIREBASE_AVAILABLE` to **Player Settings → Other Settings → Scripting Define Symbols**
 4. `FirebaseManager` will auto-switch from Mock to real Firebase
+5. Config files (`google-services.json`, `GoogleService-Info.plist`) should already be in `Assets/`
 
 ---
 
 ## 🗺️ Step 13: Map Setup (Sunny Meadows)
 
 1. Create terrain or flat plane in Gameplay scene
-2. Import the **Low-Poly Simple Nature Pack** assets
+2. Use the imported **Low-Poly Simple Nature Pack** assets (already in project)
 3. Dress the map: trees, rocks, grass, flowers, fences
-4. Apply **Fantasy Skybox** to the scene lighting
+4. Apply **Fantasy Skybox** to the scene lighting (Window → Rendering → Lighting → Environment)
 5. Create team spawn zones (color-coded areas, one per team)
 6. Create power-up spawn points scattered around the map
 7. Add environmental hazards (bee spawners, mud patches, hay bales)
