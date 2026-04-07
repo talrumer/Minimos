@@ -81,3 +81,8 @@ plastic.wktree
 
 # Superpowers specs
 docs/superpowers/
+
+# Firebase config files (contain API keys)
+**/google-services.json
+**/GoogleService-Info.plist
+FirebaseConfigurationFiles/

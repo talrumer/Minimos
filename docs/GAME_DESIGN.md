@@ -891,6 +891,122 @@ During gameplay, players can quickly express reactions via a **D-pad / number ke
 
 ---
 
+## 🔥 Backend — Firebase
+
+### Why Firebase?
+- ✅ **Zero server code** — everything runs client-side with security rules
+- ✅ **Generous free tier** — Spark plan covers: 50K reads/day, 20K writes/day, 1GB storage, 10GB bandwidth
+- ✅ **Real-time listeners** — perfect for lobby browsing, friend status, live updates
+- ✅ **Built-in auth** — Anonymous + Google Sign-In, no custom auth server needed
+- ✅ **Scales if we need it** — Blaze plan is pay-as-you-go, no upfront commitment
+
+### Firebase Project
+- **Project ID:** `minimos-3d`
+- **Package:** `com.pexon.minimos`
+- **Config files:** `Assets/google-services.json` (Android) + `Assets/GoogleService-Info.plist` (iOS) — gitignored
+
+### Services Used
+
+| Service | Purpose | Free Tier Limit |
+|---|---|---|
+| **🔐 Firebase Auth** | Player identity (Anonymous → upgrade to Google) | 10K monthly active users |
+| **📂 Cloud Firestore** | All game data (profiles, friends, lobbies, inventory, stats) | 50K reads, 20K writes, 20K deletes/day |
+| **📦 Cloud Storage** | Future: profile pictures, UGC | 5GB storage, 1GB/day download |
+
+### Firestore Collections Schema
+
+```
+📁 users/{userId}
+├── displayName: string
+├── level: number
+├── xp: number
+├── coins: number
+├── createdAt: timestamp
+├── lastOnline: timestamp
+├── totalGamesPlayed: number
+├── totalWins: number
+└── 📁 inventory/{itemId}
+    ├── itemType: string ("hat" | "face" | "back" | "shoes" | "pattern" | "emote" | "victoryEffect" | "soundEffect")
+    ├── itemName: string
+    ├── equippedSlot: boolean
+    └── acquiredAt: timestamp
+
+📁 users/{userId}/friends/{friendUserId}
+├── status: string ("pending" | "accepted" | "blocked")
+├── since: timestamp
+└── displayName: string (denormalized for quick reads)
+
+📁 lobbies/{lobbyId}
+├── hostId: string (userId of host)
+├── hostName: string
+├── roomCode: string (6-char, indexed for lookup)
+├── status: string ("waiting" | "in_game" | "finished")
+├── gameMode: string ("quick_play" | "private")
+├── maxPlayers: number
+├── currentPlayers: number
+├── teamCount: number
+├── region: string
+├── createdAt: timestamp
+├── settings: map
+│   ├── rounds: number
+│   ├── mutators: array<string>
+│   └── miniGameSelection: string ("random" | "vote" | "host_pick")
+└── 📁 players/{userId}
+    ├── displayName: string
+    ├── teamIndex: number
+    ├── ready: boolean
+    └── cosmetics: map (equipped items snapshot)
+
+📁 leaderboards/{season}
+└── 📁 entries/{userId}
+    ├── displayName: string
+    ├── totalPoints: number
+    ├── wins: number
+    ├── gamesPlayed: number
+    └── updatedAt: timestamp
+
+📁 matchHistory/{matchId}
+├── startedAt: timestamp
+├── endedAt: timestamp
+├── teamCount: number
+├── rounds: array<map>
+│   ├── miniGame: string
+│   ├── rankings: array<map> (teamIndex + points)
+│   └── mvpStat: map (playerId + stat)
+├── finalRankings: array<map> (teamIndex + totalPoints)
+└── playerIds: array<string> (for querying "my match history")
+```
+
+### Security Rules Philosophy
+- ✅ **Users can only write their own profile** (`request.auth.uid == userId`)
+- ✅ **Lobby host can update lobby settings** (`resource.data.hostId == request.auth.uid`)
+- ✅ **Players can only modify their own lobby player entry**
+- ✅ **Leaderboard writes are validated** (can only increment, not set arbitrary values)
+- ✅ **Match history is write-once** (no edits after creation)
+- ✅ **Inventory writes are server-validated** via Firestore rules (can't add items you didn't earn/buy)
+- ❌ **No client can delete other users' data**
+- ❌ **No client can read other users' friend lists** (privacy)
+
+### Auth Flow
+1. **First launch** → Anonymous sign-in (instant, no friction)
+2. **Player sets display name** → stored in Firestore `users/{uid}`
+3. **Optional: Link to Google account** → preserves progress across devices
+4. **On subsequent launches** → auto-sign-in with persisted credentials
+
+### Lobby Browsing (Real-Time)
+- Client listens to `lobbies` collection where `status == "waiting"` and `gameMode == "quick_play"`
+- Firestore real-time listener updates the lobby list live (no polling!)
+- When player joins, increment `currentPlayers` atomically
+- When player leaves or disconnects, decrement via a Firestore onDisconnect-style cleanup (or periodic cleanup)
+- Lobby document is deleted by host when game ends
+
+### Offline Handling
+- Firestore offline persistence enabled — profile/inventory loads even without internet
+- Can't browse lobbies or matchmake offline (obviously)
+- Cosmetic equipping works offline, syncs when reconnected
+
+---
+
 ## 🌐 Networking & Multiplayer
 
 ### Architecture — 100% P2P, Zero Server Costs
@@ -961,7 +1077,10 @@ During gameplay, players can quickly express reactions via a **D-pad / number ke
 - ✅ Unity Input System (gamepad + keyboard/mouse)
 - ✅ Cinemachine 3.x (dynamic gameplay cameras)
 - ✅ Unity Transport 2.x
-- ✅ Unity Multiplayer Services (lobby/matchmaking)
+- ✅ Unity Relay (free tier — NAT traversal for P2P)
+- ✅ Unity Lobby (free tier — room codes + matchmaking)
+- ✅ Firebase Auth + Cloud Firestore (free Spark tier — player data, lobbies, friends)
+- ✅ Firebase SDK for Unity
 - ✅ TextMesh Pro (UI text)
 - ✅ Visual Effect Graph (particles, VFX)
 
