@@ -420,8 +420,6 @@ namespace Minimos.Editor
             if (playerPrefab != null)
                 SetSerializedProperty(soNet, "NetworkConfig.PlayerPrefab", playerPrefab);
 
-            // Create and wire network prefabs list
-            CreateAndWireNetworkPrefabsList(soNet);
             soNet.ApplyModifiedPropertiesWithoutUndo();
 
             // Our managers
@@ -452,7 +450,57 @@ namespace Minimos.Editor
                 soAnnouncer.ApplyModifiedPropertiesWithoutUndo();
             }
 
+            // NOW replace the NetworkPrefabsLists AFTER all initialization is done.
+            // NetworkManager.AddComponent initializes with DefaultNetworkPrefabs from the project.
+            // We need to forcefully replace it with our own list.
+            ForceReplaceNetworkPrefabsList(netManager);
+
             Debug.Log("✅ [Minimos Setup] SplashScreen: GameBootstrap created with all managers wired.");
+        }
+
+        /// <summary>
+        /// Forcefully replaces the NetworkManager's prefab list with our MinimosNetworkPrefabs.
+        /// Must be called AFTER AddComponent has finished initializing.
+        /// </summary>
+        private static void ForceReplaceNetworkPrefabsList(Unity.Netcode.NetworkManager netManager)
+        {
+            // Create our prefabs list asset
+            string prefabsListDir = $"{PrefabPath}/Network";
+            EnsureDirectory(prefabsListDir);
+            string prefabsListPath = $"{prefabsListDir}/MinimosNetworkPrefabs.asset";
+
+            Unity.Netcode.NetworkPrefabsList prefabsList;
+            if (AssetExists(prefabsListPath))
+            {
+                prefabsList = AssetDatabase.LoadAssetAtPath<Unity.Netcode.NetworkPrefabsList>(prefabsListPath);
+            }
+            else
+            {
+                prefabsList = ScriptableObject.CreateInstance<Unity.Netcode.NetworkPrefabsList>();
+                AssetDatabase.CreateAsset(prefabsList, prefabsListPath);
+
+                var playerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabPath}/Player/MinimoPlayer.prefab");
+                var projectilePrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabPath}/Player/Projectile.prefab");
+
+                if (playerPrefab != null)
+                    prefabsList.Add(new Unity.Netcode.NetworkPrefab { Prefab = playerPrefab });
+                if (projectilePrefab != null)
+                    prefabsList.Add(new Unity.Netcode.NetworkPrefab { Prefab = projectilePrefab });
+
+                EditorUtility.SetDirty(prefabsList);
+                AssetDatabase.SaveAssets();
+                prefabsList = AssetDatabase.LoadAssetAtPath<Unity.Netcode.NetworkPrefabsList>(prefabsListPath);
+            }
+
+            // Use the public API directly: clear existing and add ours
+            // NetworkManager.NetworkConfig.Prefabs.NetworkPrefabsLists is a public List<>
+            netManager.NetworkConfig.Prefabs.NetworkPrefabsLists.Clear();
+            netManager.NetworkConfig.Prefabs.NetworkPrefabsLists.Add(prefabsList);
+
+            // Mark dirty so Unity knows to save this
+            EditorUtility.SetDirty(netManager);
+
+            Debug.Log("✅ [Minimos Setup] Replaced NetworkPrefabsLists with MinimosNetworkPrefabs.");
         }
 
         // --- MainMenu: Canvas with buttons ---
