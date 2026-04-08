@@ -48,6 +48,9 @@ namespace Minimos.Editor
         private int decorationCount;
 
         private bool includeBoundaries = true;
+        private bool includeWater = true;
+        private float waterLevel = -0.5f;
+        private int waterExtent = 200;
         private int teamCount = 4;
         private int powerUpSpawnCount = 6;
         private int flagSpawnCount = 3;
@@ -121,6 +124,8 @@ namespace Minimos.Editor
             DrawPropsSection();
             EditorGUILayout.Space(4);
             DrawBoundariesToggle();
+            EditorGUILayout.Space(4);
+            DrawWaterSection();
             EditorGUILayout.Space(4);
             DrawSpawnPointsSection();
             EditorGUILayout.Space(4);
@@ -266,6 +271,28 @@ namespace Minimos.Editor
             includeBoundaries = EditorGUILayout.Toggle("🧱 Include Boundaries", includeBoundaries);
         }
 
+        private void DrawWaterSection()
+        {
+            var prevBg = GUI.backgroundColor;
+            GUI.backgroundColor = new Color(0.3f, 0.6f, 1f, 0.15f);
+            EditorGUILayout.BeginVertical("box");
+            GUI.backgroundColor = prevBg;
+
+            DrawSectionHeader("🌊 Water");
+            includeWater = EditorGUILayout.Toggle("Enable Water", includeWater);
+
+            if (includeWater)
+            {
+                waterLevel = EditorGUILayout.Slider("Water Level", waterLevel, -3f, 0f);
+                waterExtent = EditorGUILayout.IntSlider("Water Extent", waterExtent, 100, 500);
+
+                var hintStyle = new GUIStyle(EditorStyles.miniLabel) { richText = true };
+                EditorGUILayout.LabelField($"  <color=#6BB5FF>Water plane: {waterExtent*2}x{waterExtent*2} units, island edges dip below water</color>", hintStyle);
+            }
+
+            EditorGUILayout.EndVertical();
+        }
+
         private void DrawSpawnPointsSection()
         {
             var prevBg = GUI.backgroundColor;
@@ -396,20 +423,24 @@ namespace Minimos.Editor
 
             try
             {
-                EditorUtility.DisplayProgressBar("Generating Map", "Creating ground...", 0.1f);
+                EditorUtility.DisplayProgressBar("Generating Map", "🌊 Creating water...", 0.05f);
+                if (includeWater)
+                    CreateWater(rootGo.transform);
+
+                EditorUtility.DisplayProgressBar("Generating Map", "⛰️ Creating ground...", 0.15f);
                 CreateGround(rootGo.transform, out var groundObj);
 
-                EditorUtility.DisplayProgressBar("Generating Map", "Creating boundaries...", 0.3f);
+                EditorUtility.DisplayProgressBar("Generating Map", "🧱 Creating boundaries...", 0.3f);
                 if (includeBoundaries)
                     CreateBoundaries(rootGo.transform);
 
-                EditorUtility.DisplayProgressBar("Generating Map", "Placing spawn points...", 0.5f);
+                EditorUtility.DisplayProgressBar("Generating Map", "📍 Placing spawn points...", 0.5f);
                 CreateSpawnPoints(rootGo.transform);
 
-                EditorUtility.DisplayProgressBar("Generating Map", "Placing props...", 0.7f);
+                EditorUtility.DisplayProgressBar("Generating Map", "🌳 Placing props...", 0.7f);
                 CreateProps(rootGo.transform, groundObj);
 
-                EditorUtility.DisplayProgressBar("Generating Map", "Applying atmosphere...", 0.9f);
+                EditorUtility.DisplayProgressBar("Generating Map", "☁️ Applying atmosphere...", 0.9f);
                 ApplyAtmosphere();
             }
             finally
@@ -423,25 +454,83 @@ namespace Minimos.Editor
 
         #endregion
 
+        #region Water
+
+        /// <summary>
+        /// Creates a large stylized water plane surrounding the map using the Bitgem StylisedWater shader.
+        /// The water extends far beyond the map to create an "island in the ocean" look.
+        /// </summary>
+        private void CreateWater(Transform parent)
+        {
+            var waterParent = new GameObject("Water");
+            waterParent.transform.SetParent(parent);
+            waterParent.transform.localPosition = Vector3.zero;
+
+            // Create the water volume using Bitgem's WaterVolumeBox
+            var waterGo = new GameObject("WaterPlane");
+            waterGo.transform.SetParent(waterParent.transform);
+            waterGo.transform.localPosition = new Vector3(0f, waterLevel, 0f);
+            waterGo.layer = 4; // Water layer
+
+            // Add MeshFilter + MeshRenderer (WaterVolumeBase requires MeshFilter)
+            waterGo.AddComponent<MeshFilter>();
+            var renderer = waterGo.AddComponent<MeshRenderer>();
+
+            // Load the water material
+            var waterMat = AssetDatabase.LoadAssetAtPath<Material>(
+                "Assets/Bitgem/StylisedWater/URP/Materials/example-water-01.mat");
+            if (waterMat != null)
+            {
+                renderer.sharedMaterial = waterMat;
+            }
+            else
+            {
+                Debug.LogWarning("⚠️ [Map Generator] Bitgem water material not found. Using fallback blue.");
+                var fallbackMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                fallbackMat.SetColor("_BaseColor", new Color(0.2f, 0.5f, 0.85f, 0.8f));
+                renderer.sharedMaterial = fallbackMat;
+            }
+
+            // Add WaterVolumeBox component for wave generation
+            var waterVolume = waterGo.AddComponent<Bitgem.VFX.StylisedWater.WaterVolumeBox>();
+            waterVolume.Dimensions = new Vector3(waterExtent * 2f, 0.1f, waterExtent * 2f);
+            waterVolume.TileSize = 2f; // Larger tiles for performance on big water planes
+            waterVolume.RealtimeUpdates = true;
+
+            // Add a large trigger collider for the water (for detecting when players fall in)
+            var waterCollider = waterGo.AddComponent<BoxCollider>();
+            waterCollider.isTrigger = true;
+            waterCollider.size = new Vector3(waterExtent * 2f, 2f, waterExtent * 2f);
+            waterCollider.center = new Vector3(0f, -1f, 0f);
+
+            Debug.Log($"🌊 [Map Generator] Water plane created: {waterExtent * 2}x{waterExtent * 2} units at Y={waterLevel}");
+        }
+
+        #endregion
+
         #region Ground
 
         /// <summary>
         /// Creates the ground surface — either a flat Unity plane or a Perlin-noise hills mesh.
+        /// When water is enabled, the ground edges slope down below water level to create an island shape.
         /// </summary>
         private void CreateGround(Transform parent, out GameObject groundObj)
         {
-            if (groundType == GroundType.FlatPlane)
+            // When water is enabled, always use mesh-based ground for island falloff
+            bool useMesh = groundType == GroundType.GentleHills || includeWater;
+
+            if (!useMesh)
             {
+                // Simple flat plane (no water, no island needed)
                 groundObj = GameObject.CreatePrimitive(PrimitiveType.Plane);
                 groundObj.name = "Ground";
                 groundObj.transform.SetParent(parent);
                 groundObj.transform.localPosition = Vector3.zero;
-                // Unity plane is 10x10 units by default, so scale = mapSize / 10
                 groundObj.transform.localScale = new Vector3(
                     mapSize.x / 10f, 1f, mapSize.y / 10f);
                 groundObj.layer = 8; // Ground
             }
-            else // GentleHills
+            else // GentleHills or island mesh
             {
                 groundObj = new GameObject("Ground");
                 groundObj.transform.SetParent(parent);
@@ -499,7 +588,35 @@ namespace Minimos.Editor
                     int i = z * (xSize + 1) + x;
                     float worldX = x - halfX;
                     float worldZ = z - halfZ;
-                    float y = Mathf.PerlinNoise(x * 0.05f + seed, z * 0.05f + seed) * 2.5f;
+                    // Perlin noise for natural variation (0 if flat plane with water)
+                    float perlinY = groundType == GroundType.GentleHills
+                        ? Mathf.PerlinNoise(x * 0.05f + seed, z * 0.05f + seed) * 2.5f
+                        : 0f;
+
+                    // Island falloff: center is high, edges dip below water level
+                    // Normalized distance from center (0 at center, 1 at edge)
+                    float nx = worldX / halfX; // -1 to 1
+                    float nz = worldZ / halfZ; // -1 to 1
+                    float edgeDist = Mathf.Sqrt(nx * nx + nz * nz); // 0 at center, ~1.4 at corners
+
+                    // Island shape: smooth falloff using smoothstep-like curve
+                    // Flat in center (0-0.6), slopes down (0.6-1.0), goes below water at edges
+                    float islandFalloff;
+                    if (includeWater)
+                    {
+                        float falloffStart = 0.5f;
+                        float falloffEnd = 1.0f;
+                        float t = Mathf.InverseLerp(falloffStart, falloffEnd, edgeDist);
+                        t = t * t * (3f - 2f * t); // smoothstep
+                        float maxDip = waterLevel - 2f; // dip well below water at edges
+                        islandFalloff = Mathf.Lerp(0f, maxDip - perlinY, t);
+                    }
+                    else
+                    {
+                        islandFalloff = 0f;
+                    }
+
+                    float y = perlinY + islandFalloff;
                     vertices[i] = new Vector3(worldX, y, worldZ);
                     uvs[i] = new Vector2((float)x / xSize, (float)z / zSize);
                 }
