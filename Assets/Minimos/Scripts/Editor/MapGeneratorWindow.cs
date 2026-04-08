@@ -469,7 +469,10 @@ namespace Minimos.Editor
             // Create the water volume using Bitgem's WaterVolumeBox
             var waterGo = new GameObject("WaterPlane");
             waterGo.transform.SetParent(waterParent.transform);
-            waterGo.transform.localPosition = new Vector3(0f, waterLevel, 0f);
+            // WaterVolumeBox generates tiles from its origin in positive X/Z direction.
+            // Offset by -half the dimensions so the water is centered on the map.
+            float halfExtent = waterExtent;
+            waterGo.transform.localPosition = new Vector3(-halfExtent, waterLevel, -halfExtent);
             waterGo.layer = 4; // Water layer
 
             // Add MeshFilter + MeshRenderer (WaterVolumeBase requires MeshFilter)
