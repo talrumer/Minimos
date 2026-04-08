@@ -133,32 +133,60 @@ namespace Minimos.Editor
 
         private void DrawHeader()
         {
-            var style = new GUIStyle(EditorStyles.boldLabel)
+            // Title
+            var titleStyle = new GUIStyle(EditorStyles.boldLabel)
             {
-                fontSize = 16,
-                alignment = TextAnchor.MiddleCenter
+                fontSize = 18,
+                alignment = TextAnchor.MiddleCenter,
+                richText = true
             };
-            EditorGUILayout.LabelField("\ud83d\uddfa\ufe0f Minimos Map Generator", style,
-                GUILayout.Height(30));
+            EditorGUILayout.LabelField("<color=#74B9FF>🗺️ Minimos Map Generator</color>", titleStyle,
+                GUILayout.Height(36));
+
+            // Subtitle
+            var subtitleStyle = new GUIStyle(EditorStyles.centeredGreyMiniLabel) { richText = true };
+            EditorGUILayout.LabelField("Generate procedural party game maps in one click", subtitleStyle);
+
+            // Separator
+            EditorGUILayout.Space(4);
+            var rect = EditorGUILayout.GetControlRect(false, 2);
+            EditorGUI.DrawRect(rect, new Color(0.45f, 0.72f, 1f, 0.4f));
         }
 
         private void DrawThemeSection()
         {
-            EditorGUILayout.LabelField("Theme", EditorStyles.boldLabel);
+            DrawSectionHeader("🎨 Theme");
 
             if (availableThemes == null || availableThemes.Length == 0)
             {
                 EditorGUILayout.HelpBox(
-                    "No MapThemeConfig assets found. Run Minimos > Map Generator > Create Default Themes first.",
+                    "No MapThemeConfig assets found.\nRun Minimos → Map Generator → Create Default Themes first.",
                     MessageType.Warning);
-                if (GUILayout.Button("Create Default Themes"))
+                var prev = GUI.backgroundColor;
+                GUI.backgroundColor = new Color(1f, 0.85f, 0.4f);
+                if (GUILayout.Button("⚡ Create Default Themes", GUILayout.Height(26)))
                     MapGeneratorLayerSetup.CreateDefaultThemes();
+                GUI.backgroundColor = prev;
                 return;
             }
 
+            // Theme emoji mapping for dropdown
             string[] themeNames = new string[availableThemes.Length];
             for (int i = 0; i < availableThemes.Length; i++)
-                themeNames[i] = availableThemes[i].ThemeName ?? availableThemes[i].name;
+            {
+                string name = availableThemes[i].ThemeName ?? availableThemes[i].name;
+                string emoji = name switch
+                {
+                    "Sunny Meadows" => "🌿",
+                    "Coral Cove" => "🏖️",
+                    "Cozy Villa" => "🏠",
+                    "Dusty Gulch" => "🤠",
+                    "Candy Castle" => "🍬",
+                    "Neon Nights" => "🌙",
+                    _ => "🗺️"
+                };
+                themeNames[i] = $"{emoji} {name}";
+            }
 
             int newIndex = EditorGUILayout.Popup("Active Theme", selectedThemeIndex, themeNames);
             if (newIndex != selectedThemeIndex)
@@ -171,24 +199,47 @@ namespace Minimos.Editor
             EditorGUI.BeginDisabledGroup(true);
             EditorGUILayout.ObjectField("Preview", selectedTheme, typeof(MapThemeConfig), false);
             EditorGUI.EndDisabledGroup();
+
+            // Theme info
+            if (selectedTheme != null && selectedTheme.UseBasicPrimitives)
+            {
+                EditorGUILayout.HelpBox(
+                    "This theme uses colored primitives (no asset pack). Great for prototyping!",
+                    MessageType.Info);
+            }
         }
 
         private void DrawMapSizeSection()
         {
-            mapSize = EditorGUILayout.Vector2IntField("Map Size", mapSize);
+            DrawSectionHeader("📐 Map Size");
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("X", GUILayout.Width(14));
+            mapSize.x = EditorGUILayout.IntField(mapSize.x);
+            EditorGUILayout.LabelField("Y", GUILayout.Width(14));
+            mapSize.y = EditorGUILayout.IntField(mapSize.y);
+            EditorGUILayout.EndHorizontal();
             mapSize.x = Mathf.Clamp(mapSize.x, 20, 200);
             mapSize.y = Mathf.Clamp(mapSize.y, 20, 200);
+
+            float area = mapSize.x * mapSize.y;
+            var infoStyle = new GUIStyle(EditorStyles.miniLabel) { richText = true };
+            EditorGUILayout.LabelField($"  <color=#888>Area: {area:N0} units² ({(area / 3600f):F1}x default)</color>", infoStyle);
         }
 
         private void DrawGroundTypeSection()
         {
-            groundType = (GroundType)EditorGUILayout.EnumPopup("Ground Type", groundType);
+            DrawSectionHeader("⛰️ Ground");
+            groundType = (GroundType)EditorGUILayout.EnumPopup("Type", groundType);
         }
 
         private void DrawPropsSection()
         {
+            var prevBg = GUI.backgroundColor;
+            GUI.backgroundColor = new Color(0.4f, 0.75f, 0.4f, 0.15f);
             EditorGUILayout.BeginVertical("box");
-            EditorGUILayout.LabelField("Props", EditorStyles.boldLabel);
+            GUI.backgroundColor = prevBg;
+
+            DrawSectionHeader("🌳 Props");
 
             var newDensity = (PropDensity)EditorGUILayout.EnumPopup("Density", density);
             if (newDensity != density)
@@ -197,31 +248,56 @@ namespace Minimos.Editor
                 RecalculateCounts();
             }
 
-            treeCount = EditorGUILayout.IntSlider("Trees", treeCount, 0, 200);
-            rockCount = EditorGUILayout.IntSlider("Rocks", rockCount, 0, 200);
-            decorationCount = EditorGUILayout.IntSlider("Decorations", decorationCount, 0, 300);
+            EditorGUILayout.Space(2);
+            treeCount = EditorGUILayout.IntSlider("🌲 Trees", treeCount, 0, 200);
+            rockCount = EditorGUILayout.IntSlider("🪨 Rocks", rockCount, 0, 200);
+            decorationCount = EditorGUILayout.IntSlider("🌸 Decorations", decorationCount, 0, 300);
+
+            // Total count
+            int total = treeCount + rockCount + decorationCount;
+            var totalStyle = new GUIStyle(EditorStyles.miniLabel) { richText = true, alignment = TextAnchor.MiddleRight };
+            EditorGUILayout.LabelField($"<color=#888>Total: {total} props</color>", totalStyle);
+
             EditorGUILayout.EndVertical();
         }
 
         private void DrawBoundariesToggle()
         {
-            includeBoundaries = EditorGUILayout.Toggle("Include Boundaries", includeBoundaries);
+            includeBoundaries = EditorGUILayout.Toggle("🧱 Include Boundaries", includeBoundaries);
         }
 
         private void DrawSpawnPointsSection()
         {
+            var prevBg = GUI.backgroundColor;
+            GUI.backgroundColor = new Color(0.4f, 0.5f, 0.9f, 0.15f);
             EditorGUILayout.BeginVertical("box");
-            EditorGUILayout.LabelField("Spawn Points", EditorStyles.boldLabel);
+            GUI.backgroundColor = prevBg;
 
-            teamCount = EditorGUILayout.IntSlider("Teams", teamCount, 2, 6);
-            powerUpSpawnCount = EditorGUILayout.IntSlider("Power-Up Spawns", powerUpSpawnCount, 0, 20);
-            flagSpawnCount = EditorGUILayout.IntSlider("Flag Spawns", flagSpawnCount, 0, 10);
+            DrawSectionHeader("📍 Spawn Points");
+
+            teamCount = EditorGUILayout.IntSlider("🏳️ Teams", teamCount, 2, 6);
+            powerUpSpawnCount = EditorGUILayout.IntSlider("⚡ Power-Ups", powerUpSpawnCount, 0, 20);
+            flagSpawnCount = EditorGUILayout.IntSlider("🚩 Flags", flagSpawnCount, 0, 10);
             EditorGUILayout.EndVertical();
         }
 
         private void DrawSeedField()
         {
-            seed = EditorGUILayout.IntField("Seed", seed);
+            EditorGUILayout.BeginHorizontal();
+            seed = EditorGUILayout.IntField("🎲 Seed", seed);
+            if (GUILayout.Button("Random", GUILayout.Width(60)))
+                seed = Random.Range(1, 99999);
+            EditorGUILayout.EndHorizontal();
+
+            var hintStyle = new GUIStyle(EditorStyles.miniLabel) { richText = true };
+            EditorGUILayout.LabelField("  <color=#888>0 = random seed each time</color>", hintStyle);
+        }
+
+        /// <summary>Draws a colored section header label.</summary>
+        private void DrawSectionHeader(string label)
+        {
+            var style = new GUIStyle(EditorStyles.boldLabel) { richText = true, fontSize = 12 };
+            EditorGUILayout.LabelField(label, style);
         }
 
         private void DrawButtons()
