@@ -51,6 +51,7 @@ namespace Minimos.Editor
         private bool includeWater = true;
         private float waterLevel = -0.5f;
         private int waterExtent = 200;
+        private float shoreWidth = 0.2f; // 0 = no sand, 1 = all sand
         private int teamCount = 4;
         private int powerUpSpawnCount = 6;
         private int flagSpawnCount = 3;
@@ -285,9 +286,10 @@ namespace Minimos.Editor
             {
                 waterLevel = EditorGUILayout.Slider("Water Level", waterLevel, -3f, 0f);
                 waterExtent = EditorGUILayout.IntSlider("Water Extent", waterExtent, 100, 500);
+                shoreWidth = EditorGUILayout.Slider("🏖️ Shore Width", shoreWidth, 0.05f, 0.5f);
 
                 var hintStyle = new GUIStyle(EditorStyles.miniLabel) { richText = true };
-                EditorGUILayout.LabelField($"  <color=#6BB5FF>Water plane: {waterExtent*2}x{waterExtent*2} units, island edges dip below water</color>", hintStyle);
+                EditorGUILayout.LabelField($"  <color=#6BB5FF>Water: {waterExtent*2}x{waterExtent*2} units | Shore: {(shoreWidth * 100f):F0}% of radius</color>", hintStyle);
             }
 
             EditorGUILayout.EndVertical();
@@ -642,8 +644,11 @@ namespace Minimos.Editor
                     // Vertex color: blend grass → sand based on proximity to water/edge
                     if (includeWater)
                     {
-                        // Sand only at the very edge — sharp transition
-                        float sandBlend = Mathf.InverseLerp(0.65f, 0.85f, edgeDist);
+                        // Sand at the edge — shoreWidth controls how far inland sand reaches
+                        // shoreWidth 0.2 → sand starts at 0.65, full sand at 0.85
+                        float sandStart = Mathf.Clamp01(0.85f - shoreWidth);
+                        float sandEnd = Mathf.Clamp01(sandStart + shoreWidth);
+                        float sandBlend = Mathf.InverseLerp(sandStart, sandEnd, edgeDist);
                         sandBlend = Mathf.Clamp01(sandBlend);
                         colors[i] = Color.Lerp(grassColor, sandColor, sandBlend);
                     }
