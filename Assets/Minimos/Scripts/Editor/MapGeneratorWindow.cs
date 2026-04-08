@@ -40,8 +40,8 @@ namespace Minimos.Editor
         private MapThemeConfig[] availableThemes;
         private int selectedThemeIndex;
 
-        private Vector2Int mapSize = new(60, 60);
-        private GroundType groundType = GroundType.FlatPlane;
+        private Vector2Int mapSize = new(100, 100);
+        private GroundType groundType = GroundType.GentleHills;
         private PropDensity density = PropDensity.Normal;
         private int treeCount;
         private int rockCount;
@@ -49,10 +49,10 @@ namespace Minimos.Editor
 
         private bool includeBoundaries = true;
         private bool includeWater = true;
-        private float waterLevel = -0.5f;
-        private int waterExtent = 200;
-        private float shoreWidth = 0.2f; // how far above water sand extends
-        private float shoreOffset = 1.0f; // how far ABOVE water the sand starts
+        private float waterLevel = -2.08f;
+        private const int WaterExtent = 200; // Fixed large extent — always big enough
+        private float shoreWidth = 0.14f; // how far above water sand extends
+        private float shoreOffset = 1.08f; // how far ABOVE water the sand starts
         private int teamCount = 4;
         private int powerUpSpawnCount = 6;
         private int flagSpawnCount = 3;
@@ -285,13 +285,12 @@ namespace Minimos.Editor
 
             if (includeWater)
             {
-                waterLevel = EditorGUILayout.Slider("Water Level", waterLevel, -3f, 0f);
-                waterExtent = EditorGUILayout.IntSlider("Water Extent", waterExtent, 100, 500);
+                waterLevel = EditorGUILayout.Slider("💧 Water Level", waterLevel, -5f, 0f);
                 shoreOffset = EditorGUILayout.Slider("🏖️ Shore Start", shoreOffset, 0f, 5f);
-                shoreWidth = EditorGUILayout.Slider("🏖️ Shore Spread", shoreWidth, 0.1f, 1f);
+                shoreWidth = EditorGUILayout.Slider("🏖️ Shore Spread", shoreWidth, 0.05f, 1f);
 
                 var hintStyle = new GUIStyle(EditorStyles.miniLabel) { richText = true };
-                EditorGUILayout.LabelField($"  <color=#6BB5FF>Sand starts {shoreOffset:F1}m above water, spreads {(shoreWidth * 10f):F1}m up</color>", hintStyle);
+                EditorGUILayout.LabelField($"  <color=#6BB5FF>Water at Y={waterLevel:F1} | Sand starts {shoreOffset:F1}m above, spreads {(shoreWidth * 10f):F1}m</color>", hintStyle);
             }
 
             EditorGUILayout.EndVertical();
@@ -475,7 +474,7 @@ namespace Minimos.Editor
             waterGo.transform.SetParent(waterParent.transform);
             // WaterVolumeBox generates tiles from its origin in positive X/Z direction.
             // Offset by -half the dimensions so the water is centered on the map.
-            float halfExtent = waterExtent;
+            float halfExtent = WaterExtent;
             waterGo.transform.localPosition = new Vector3(-halfExtent, waterLevel, -halfExtent);
             waterGo.layer = 4; // Water layer
 
@@ -484,24 +483,11 @@ namespace Minimos.Editor
             var renderer = waterGo.AddComponent<MeshRenderer>();
 
             // Load the water material
-            // Load base water material and create a copy with boosted foam
-            var baseMat = AssetDatabase.LoadAssetAtPath<Material>(
+            // Use the original Bitgem water material directly (foam works better without copying)
+            var waterMat = AssetDatabase.LoadAssetAtPath<Material>(
                 "Assets/Bitgem/StylisedWater/URP/Materials/example-water-01.mat");
-            if (baseMat != null)
+            if (waterMat != null)
             {
-                var waterMat = new Material(baseMat);
-                waterMat.name = "MinimosWater";
-
-                // Boost foam settings for visible shore foam
-                // _DepthFoam (Vector1_E5C51606): controls foam intensity at depth edges
-                waterMat.SetFloat("Vector1_E5C51606", 0.9f);  // _DepthFoam: up from 0.71
-                // _FoamWidth (Vector1_36E8227): width of foam band
-                waterMat.SetFloat("Vector1_36E8227", 0.85f);  // _FoamWidth: up from 0.65
-                // _DepthScale (Vector1_17E53C12): how far depth detection reaches
-                waterMat.SetFloat("Vector1_17E53C12", 0.9f);  // _DepthScale: up from 0.62
-                // _DepthPower (Vector1_A0EAD698): depth contrast
-                waterMat.SetFloat("Vector1_A0EAD698", 0.8f);  // _DepthPower: up from 0.6
-
                 renderer.sharedMaterial = waterMat;
             }
             else
@@ -514,7 +500,7 @@ namespace Minimos.Editor
 
             // Add WaterVolumeBox component for wave generation
             var waterVolume = waterGo.AddComponent<Bitgem.VFX.StylisedWater.WaterVolumeBox>();
-            waterVolume.Dimensions = new Vector3(waterExtent * 2f, 0.1f, waterExtent * 2f);
+            waterVolume.Dimensions = new Vector3(WaterExtent * 2f, 0.1f, WaterExtent * 2f);
             waterVolume.TileSize = 2f; // Larger tiles for performance on big water planes
             waterVolume.RealtimeUpdates = true;
 
@@ -527,10 +513,10 @@ namespace Minimos.Editor
             // Add a large trigger collider for the water (for detecting when players fall in)
             var waterCollider = waterGo.AddComponent<BoxCollider>();
             waterCollider.isTrigger = true;
-            waterCollider.size = new Vector3(waterExtent * 2f, 2f, waterExtent * 2f);
+            waterCollider.size = new Vector3(WaterExtent * 2f, 2f, WaterExtent * 2f);
             waterCollider.center = new Vector3(0f, -1f, 0f);
 
-            Debug.Log($"🌊 [Map Generator] Water plane created: {waterExtent * 2}x{waterExtent * 2} units at Y={waterLevel}");
+            Debug.Log($"🌊 [Map Generator] Water plane created: {WaterExtent * 2}x{WaterExtent * 2} units at Y={waterLevel}");
         }
 
         #endregion
