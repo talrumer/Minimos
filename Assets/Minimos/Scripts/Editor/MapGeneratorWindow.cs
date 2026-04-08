@@ -50,7 +50,7 @@ namespace Minimos.Editor
         private bool includeBoundaries = true;
         private bool includeWater = true;
         private float waterLevel = -2.08f;
-        private const int WaterExtent = 200; // Fixed large extent — always big enough
+        private const int WaterExtent = 100; // Water extends 100 units from center (200x200 total)
         private float shoreWidth = 0.14f; // how far above water sand extends
         private float shoreOffset = 1.08f; // how far ABOVE water the sand starts
         private int teamCount = 4;
