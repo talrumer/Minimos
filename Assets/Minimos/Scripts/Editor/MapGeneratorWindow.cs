@@ -483,12 +483,15 @@ namespace Minimos.Editor
             var renderer = waterGo.AddComponent<MeshRenderer>();
 
             // Load the water material
-            // Use the original Bitgem water material directly (foam works better without copying)
-            var waterMat = AssetDatabase.LoadAssetAtPath<Material>(
+            // Create a material instance with thinner foam for our island shore
+            var baseMat = AssetDatabase.LoadAssetAtPath<Material>(
                 "Assets/Bitgem/StylisedWater/URP/Materials/example-water-01.mat");
-            if (waterMat != null)
+            if (baseMat != null)
             {
-                renderer.sharedMaterial = waterMat;
+                renderer.sharedMaterial = new Material(baseMat);
+                renderer.sharedMaterial.name = "MinimosWater";
+                // Reduce foam width — default 0.65 is too thick for shore foam
+                renderer.sharedMaterial.SetFloat("Vector1_36E8227", 0.15f); // _FoamWidth
             }
             else
             {
@@ -501,7 +504,7 @@ namespace Minimos.Editor
             // Add WaterVolumeBox component for wave generation
             var waterVolume = waterGo.AddComponent<Bitgem.VFX.StylisedWater.WaterVolumeBox>();
             waterVolume.Dimensions = new Vector3(WaterExtent * 2f, 0.1f, WaterExtent * 2f);
-            waterVolume.TileSize = 1f; // Smaller tiles = better foam resolution (example uses 0.5)
+            waterVolume.TileSize = 2f; // Must be 2 to cover full extent within MAX_TILES (100) limit
             waterVolume.RealtimeUpdates = false; // Match example scene setting
 
             // Enable foam on all faces
