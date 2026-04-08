@@ -484,10 +484,24 @@ namespace Minimos.Editor
             var renderer = waterGo.AddComponent<MeshRenderer>();
 
             // Load the water material
-            var waterMat = AssetDatabase.LoadAssetAtPath<Material>(
+            // Load base water material and create a copy with boosted foam
+            var baseMat = AssetDatabase.LoadAssetAtPath<Material>(
                 "Assets/Bitgem/StylisedWater/URP/Materials/example-water-01.mat");
-            if (waterMat != null)
+            if (baseMat != null)
             {
+                var waterMat = new Material(baseMat);
+                waterMat.name = "MinimosWater";
+
+                // Boost foam settings for visible shore foam
+                // _DepthFoam (Vector1_E5C51606): controls foam intensity at depth edges
+                waterMat.SetFloat("Vector1_E5C51606", 0.9f);  // _DepthFoam: up from 0.71
+                // _FoamWidth (Vector1_36E8227): width of foam band
+                waterMat.SetFloat("Vector1_36E8227", 0.85f);  // _FoamWidth: up from 0.65
+                // _DepthScale (Vector1_17E53C12): how far depth detection reaches
+                waterMat.SetFloat("Vector1_17E53C12", 0.9f);  // _DepthScale: up from 0.62
+                // _DepthPower (Vector1_A0EAD698): depth contrast
+                waterMat.SetFloat("Vector1_A0EAD698", 0.8f);  // _DepthPower: up from 0.6
+
                 renderer.sharedMaterial = waterMat;
             }
             else
@@ -503,6 +517,12 @@ namespace Minimos.Editor
             waterVolume.Dimensions = new Vector3(waterExtent * 2f, 0.1f, waterExtent * 2f);
             waterVolume.TileSize = 2f; // Larger tiles for performance on big water planes
             waterVolume.RealtimeUpdates = true;
+
+            // Ensure foam is rendered on all edge faces
+            waterVolume.IncludeFoam = Bitgem.VFX.StylisedWater.WaterVolumeBase.TileFace.NegX
+                                    | Bitgem.VFX.StylisedWater.WaterVolumeBase.TileFace.PosX
+                                    | Bitgem.VFX.StylisedWater.WaterVolumeBase.TileFace.NegZ
+                                    | Bitgem.VFX.StylisedWater.WaterVolumeBase.TileFace.PosZ;
 
             // Add a large trigger collider for the water (for detecting when players fall in)
             var waterCollider = waterGo.AddComponent<BoxCollider>();
