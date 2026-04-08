@@ -17,6 +17,7 @@
 - Use `SerializedObject` + `FindProperty` to set private `[SerializeField]` fields.
 - Save prefab first with `PrefabUtility.SaveAsPrefabAsset`, then load it back to wire references.
 - Only use **⚠️ MANUAL ACTION** for things that genuinely can't be automated (e.g., linking Unity Dashboard, dragging prefabs into scenes, visual scene design).
+- **📖 READ `docs/UNITY_EDITOR_GOTCHAS.md` before writing any Editor script.** It contains critical gotchas about SerializedObject, prefab wiring, namespace collisions, Cinemachine 3.x API, Netcode serialization, and NetworkManager quirks that will save hours of debugging.
 
 ## Project Overview
 - **Minimos** — a P2P multiplayer party game built in Unity
@@ -44,4 +45,5 @@
 ## Key Docs
 - `docs/GAME_DESIGN.md` — full game design document
 - `docs/ASSET_SCOUTING.md` — asset packs (free + paid upgrade path)
+- `docs/UNITY_EDITOR_GOTCHAS.md` — **must-read before writing Editor scripts** (SerializedObject, prefabs, Cinemachine, Netcode, namespaces)
 - `Assets/Minimos/MANUAL_SETUP.md` — Unity Editor setup steps
