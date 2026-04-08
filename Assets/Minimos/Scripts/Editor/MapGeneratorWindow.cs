@@ -641,15 +641,15 @@ namespace Minimos.Editor
                     vertices[i] = new Vector3(worldX, y, worldZ);
                     uvs[i] = new Vector2((float)x / xSize, (float)z / zSize);
 
-                    // Vertex color: blend grass → sand based on proximity to water/edge
+                    // Vertex color: blend grass → sand based on height relative to water
                     if (includeWater)
                     {
-                        // Sand at the edge — shoreWidth controls how far inland sand reaches
-                        // shoreWidth 0.2 → sand starts at 0.65, full sand at 0.85
-                        float sandStart = Mathf.Clamp01(0.85f - shoreWidth);
-                        float sandEnd = Mathf.Clamp01(sandStart + shoreWidth);
-                        float sandBlend = Mathf.InverseLerp(sandStart, sandEnd, edgeDist);
-                        sandBlend = Mathf.Clamp01(sandBlend);
+                        // Sand appears near the waterline — based on actual ground height, not distance
+                        // shoreWidth controls how far above water the sand reaches (in world units)
+                        float shoreHeightRange = shoreWidth * 10f; // e.g. 0.2 → 2 units above water
+                        float heightAboveWater = y - waterLevel;
+                        // Full sand at waterline (0), full grass at shoreHeightRange above water
+                        float sandBlend = 1f - Mathf.Clamp01(heightAboveWater / shoreHeightRange);
                         colors[i] = Color.Lerp(grassColor, sandColor, sandBlend);
                     }
                     else
