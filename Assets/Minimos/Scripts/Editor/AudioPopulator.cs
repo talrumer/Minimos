@@ -215,15 +215,17 @@ namespace Minimos.Editor
                 var (evt, patterns) = eventMappings[i];
                 var element = entriesProp.GetArrayElementAtIndex(i);
 
-                // Set event type
-                var eventProp = element.FindPropertyRelative("eventType");
+                // Set event type (public field = PascalCase in serialization)
+                var eventProp = element.FindPropertyRelative("EventType");
                 if (eventProp != null)
                     eventProp.enumValueIndex = (int)evt;
+                else
+                    Debug.LogError($"🚨 [Audio Populator] 'EventType' property not found on entry {i}!");
 
                 // Find matching clips
                 var clips = FindAnnouncerClips(patterns, 5); // max 5 clips per event
 
-                var clipsProp = element.FindPropertyRelative("clips");
+                var clipsProp = element.FindPropertyRelative("Clips");
                 if (clipsProp != null)
                 {
                     clipsProp.arraySize = clips.Count;
@@ -241,7 +243,7 @@ namespace Minimos.Editor
             for (int i = 0; i < eventMappings.Length; i++)
             {
                 var element = entriesProp.GetArrayElementAtIndex(i);
-                var clipsProp = element.FindPropertyRelative("clips");
+                var clipsProp = element.FindPropertyRelative("Clips");
                 int count = clipsProp != null ? clipsProp.arraySize : 0;
                 Debug.Log($"  📣 {eventMappings[i].evt}: {count} clip(s)");
             }
