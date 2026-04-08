@@ -51,7 +51,8 @@ namespace Minimos.Editor
         private bool includeWater = true;
         private float waterLevel = -0.5f;
         private int waterExtent = 200;
-        private float shoreWidth = 0.2f; // 0 = no sand, 1 = all sand
+        private float shoreWidth = 0.2f; // how far above water sand extends
+        private float shoreOffset = 1.0f; // how far ABOVE water the sand starts
         private int teamCount = 4;
         private int powerUpSpawnCount = 6;
         private int flagSpawnCount = 3;
@@ -286,10 +287,11 @@ namespace Minimos.Editor
             {
                 waterLevel = EditorGUILayout.Slider("Water Level", waterLevel, -3f, 0f);
                 waterExtent = EditorGUILayout.IntSlider("Water Extent", waterExtent, 100, 500);
-                shoreWidth = EditorGUILayout.Slider("🏖️ Shore Width", shoreWidth, 0.05f, 0.5f);
+                shoreOffset = EditorGUILayout.Slider("🏖️ Shore Start", shoreOffset, 0f, 5f);
+                shoreWidth = EditorGUILayout.Slider("🏖️ Shore Spread", shoreWidth, 0.1f, 1f);
 
                 var hintStyle = new GUIStyle(EditorStyles.miniLabel) { richText = true };
-                EditorGUILayout.LabelField($"  <color=#6BB5FF>Water: {waterExtent*2}x{waterExtent*2} units | Shore: {(shoreWidth * 100f):F0}% of radius</color>", hintStyle);
+                EditorGUILayout.LabelField($"  <color=#6BB5FF>Sand starts {shoreOffset:F1}m above water, spreads {(shoreWidth * 10f):F1}m up</color>", hintStyle);
             }
 
             EditorGUILayout.EndVertical();
@@ -644,12 +646,31 @@ namespace Minimos.Editor
                     // Vertex color: blend grass → sand based on height relative to water
                     if (includeWater)
                     {
-                        // Sand appears near the waterline — based on actual ground height, not distance
-                        // shoreWidth controls how far above water the sand reaches (in world units)
-                        float shoreHeightRange = shoreWidth * 10f; // e.g. 0.2 → 2 units above water
                         float heightAboveWater = y - waterLevel;
-                        // Full sand at waterline (0), full grass at shoreHeightRange above water
-                        float sandBlend = 1f - Mathf.Clamp01(heightAboveWater / shoreHeightRange);
+
+                        // shoreOffset = how far above water the FULL SAND zone sits
+                        // shoreWidth * 10 = how many units the gradient from sand→grass spans
+                        // Below shoreOffset: full sand
+                        // From shoreOffset to shoreOffset + spread: gradient sand→grass
+                        // Above shoreOffset + spread: full grass
+                        float spread = shoreWidth * 10f;
+                        float sandTop = shoreOffset + spread; // height where it becomes full grass
+
+                        float sandBlend;
+                        if (heightAboveWater <= shoreOffset)
+                        {
+                            sandBlend = 1f; // Below or at shore start = full sand
+                        }
+                        else if (heightAboveWater >= sandTop)
+                        {
+                            sandBlend = 0f; // Above spread = full grass
+                        }
+                        else
+                        {
+                            // Gradient zone
+                            sandBlend = 1f - Mathf.InverseLerp(shoreOffset, sandTop, heightAboveWater);
+                        }
+
                         colors[i] = Color.Lerp(grassColor, sandColor, sandBlend);
                     }
                     else
