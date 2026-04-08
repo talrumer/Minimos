@@ -278,8 +278,9 @@ namespace Minimos.Networking
             try
             {
                 connectedPlayers.Clear();
-                var options = new QuickJoinSessionOptions();
-                activeSession = await MultiplayerService.Instance.QuickJoinSessionAsync(options);
+                var quickJoinOptions = new QuickJoinOptions();
+                var sessionOptions = new SessionOptions { MaxPlayers = MaxPlayers }.WithRelayNetwork();
+                activeSession = await MultiplayerService.Instance.MatchmakeSessionAsync(quickJoinOptions, sessionOptions);
 
                 Debug.Log($"[NetworkGameManager] Quick-joined session: {activeSession.Id} | Code: {activeSession.Code}");
                 OnSessionStarted?.Invoke(activeSession);

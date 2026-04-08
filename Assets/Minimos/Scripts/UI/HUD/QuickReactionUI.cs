@@ -65,13 +65,13 @@ namespace Minimos.UI
             if (cooldownTimer > 0f) return;
 
             // D-pad / keyboard input mapping.
-            if (Input.GetKeyDown(KeyCode.UpArrow))
+            if (UnityEngine.Input.GetKeyDown(KeyCode.UpArrow))
                 RequestReaction(ReactionType.Happy);
-            else if (Input.GetKeyDown(KeyCode.RightArrow))
+            else if (UnityEngine.Input.GetKeyDown(KeyCode.RightArrow))
                 RequestReaction(ReactionType.Celebrate);
-            else if (Input.GetKeyDown(KeyCode.DownArrow))
+            else if (UnityEngine.Input.GetKeyDown(KeyCode.DownArrow))
                 RequestReaction(ReactionType.Sad);
-            else if (Input.GetKeyDown(KeyCode.LeftArrow))
+            else if (UnityEngine.Input.GetKeyDown(KeyCode.LeftArrow))
                 RequestReaction(ReactionType.Angry);
         }
 

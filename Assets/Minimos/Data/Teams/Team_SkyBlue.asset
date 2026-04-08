@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0316d624aca7e41d08cd6d9efb2862b8, type: 3}
+  m_Name: Team_SkyBlue
+  m_EditorClassIdentifier: Assembly-CSharp::Minimos.Teams.TeamData
+  teamIndex: 1
+  teamName: Sky Blue
+  teamColor: {r: 0.455, g: 0.725, b: 1, a: 1}
+  teamColorHex: '#74B9FF'
+  accentColor: {r: 0.161, g: 0.502, b: 0.725, a: 1}
+  accentColorHex: '#0984E3'

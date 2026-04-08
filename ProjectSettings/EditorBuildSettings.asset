@@ -6,22 +6,22 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Core/TestScenes/[BB] Core.unity
-    guid: 5492879da6a8a4759a6862bcc1e31e6e
+    path: Assets/Minimos/Scenes/SplashScreen.unity
+    guid: 477cb2e2e4d7b478fbfc86210bd6dd77
   - enabled: 1
-    path: Assets/Core/TestScenes/[BB] Core MultiplayerSession.unity
-    guid: e51f9a6c5c03e4afd816dfab25b341e2
+    path: Assets/Minimos/Scenes/MainMenu.unity
+    guid: a55be66d0427b46a0aa9c92e32a8ca80
   - enabled: 1
-    path: Assets/Platformer/TestScenes/[BB] Platformer.unity
-    guid: 4e44aede820bc4317a6a9afc9a194aea
+    path: Assets/Minimos/Scenes/CharacterStudio.unity
+    guid: 45935a0b118e74dcc9ad4330cc5e9784
   - enabled: 1
-    path: Assets/Platformer/TestScenes/[BB] Platformer MultiplayerSession.unity
-    guid: 46163feafa167ab45826fb15439b5e0d
+    path: Assets/Minimos/Scenes/Lobby.unity
+    guid: f331dc484b3784807801c87b8d76c6fe
   - enabled: 1
-    path: Assets/Shooter/TestScenes/[BB] Shooter.unity
-    guid: ca11eb50b69e04df28644ca096307470
+    path: Assets/Minimos/Scenes/Gameplay.unity
+    guid: d608cd8b7163949bdb97f9bae55bc87c
   - enabled: 1
-    path: Assets/Shooter/TestScenes/[BB] Shooter MultiplayerSession.unity
-    guid: 7d42b85864099114e8d3c5e25250b013
+    path: Assets/Minimos/Scenes/Results.unity
+    guid: 8f044080714794c80ba337a1f4b0bf46
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}

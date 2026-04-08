@@ -144,7 +144,7 @@ namespace Minimos.Camera
 
         private void HandleCycleInput()
         {
-            if (Input.GetKeyDown(cycleKey) && aliveTargets.Count > 0)
+            if (UnityEngine.Input.GetKeyDown(cycleKey) && aliveTargets.Count > 0)
             {
                 currentTargetIndex = (currentTargetIndex + 1) % aliveTargets.Count;
                 UpdateSpectatingLabel();
@@ -157,8 +157,8 @@ namespace Minimos.Camera
             if (target == null) return;
 
             // Mouse orbit.
-            horizontalAngle += Input.GetAxis("Mouse X") * orbitSpeed * Time.deltaTime;
-            verticalAngle -= Input.GetAxis("Mouse Y") * verticalSpeed * Time.deltaTime;
+            horizontalAngle += UnityEngine.Input.GetAxis("Mouse X") * orbitSpeed * Time.deltaTime;
+            verticalAngle -= UnityEngine.Input.GetAxis("Mouse Y") * verticalSpeed * Time.deltaTime;
             verticalAngle = Mathf.Clamp(verticalAngle, minVerticalAngle, maxVerticalAngle);
 
             // Calculate orbit position.

@@ -1,0 +1,85 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ba527b9cd59524497a6ef2bbbe73ec30, type: 3}
+  m_Name: AnnouncerConfig
+  m_EditorClassIdentifier: Assembly-CSharp::Minimos.Announcer.AnnouncerConfig
+  entries:
+  - EventType: 0
+    Clips:
+    - {fileID: 8300000, guid: a28213db120a53647819ffd98cf02593, type: 3}
+    - {fileID: 8300000, guid: 38a36124961681e4ca85f4ba531c81f6, type: 3}
+    - {fileID: 8300000, guid: 5e3fc56af5da8f94d8676db749f8a6dd, type: 3}
+    - {fileID: 8300000, guid: b420c3a00088c1a48bc9321fd4b11b31, type: 3}
+    - {fileID: 8300000, guid: 1e64431fc63d9bd4e978a68073f1a42b, type: 3}
+  - EventType: 1
+    Clips:
+    - {fileID: 8300000, guid: ad006c7bd7a37f7428604ef919b36cf9, type: 3}
+    - {fileID: 8300000, guid: 18de1295fe68671458440c9786009b4f, type: 3}
+    - {fileID: 8300000, guid: 5bffa2dab3dde274a8ad519c2346d960, type: 3}
+    - {fileID: 8300000, guid: a0a0a90d17af73b49b0bd5c728d4ca8b, type: 3}
+    - {fileID: 8300000, guid: 3c7c49f5393316e4eb555a705f890d6d, type: 3}
+  - EventType: 2
+    Clips:
+    - {fileID: 8300000, guid: fdb856e84bfeffe42bbb74b8b47f74a6, type: 3}
+    - {fileID: 8300000, guid: 8401f03e521bc6d44b59909af2c20057, type: 3}
+    - {fileID: 8300000, guid: e281a18ea3a88d148b28a0675f70ec84, type: 3}
+    - {fileID: 8300000, guid: 987b60caadb2aa44a85f15af91790dd0, type: 3}
+    - {fileID: 8300000, guid: 1c8442aeb65a24f419703d05f037d9cc, type: 3}
+  - EventType: 3
+    Clips:
+    - {fileID: 8300000, guid: 92efedfe6a39dd54cacc40a9c2a7bf68, type: 3}
+    - {fileID: 8300000, guid: 04d6848a6c38cf4498aa4134edf57caa, type: 3}
+    - {fileID: 8300000, guid: 63849ac6dcc25b047b05626b64a9dd84, type: 3}
+    - {fileID: 8300000, guid: 831953acc4b4e1e4da53d33748228db9, type: 3}
+    - {fileID: 8300000, guid: 2b080d8038fb1eb43bd80ab8f116a84d, type: 3}
+  - EventType: 4
+    Clips:
+    - {fileID: 8300000, guid: 038b584b6f597674f9f2d03517ed83fa, type: 3}
+    - {fileID: 8300000, guid: 987d7a94dfca98f4abca6b8d46047991, type: 3}
+    - {fileID: 8300000, guid: f950ad5b70c557648a12c6875b61abbc, type: 3}
+    - {fileID: 8300000, guid: a52e6999d9a141747a2388927366ee83, type: 3}
+    - {fileID: 8300000, guid: f7bb89f9c0d7cc549a2019d81da29112, type: 3}
+  - EventType: 5
+    Clips:
+    - {fileID: 8300000, guid: a990d44127975a14181d33c3f5adb677, type: 3}
+    - {fileID: 8300000, guid: 873fec561d0f59442b8fb28aeaf037dc, type: 3}
+    - {fileID: 8300000, guid: 4fb0ca26d63fd4d45a612e898e0c05ab, type: 3}
+    - {fileID: 8300000, guid: 3938f206f84252a449cc0029115487a5, type: 3}
+    - {fileID: 8300000, guid: 66e8aac061aed7342931fdce5ce20c35, type: 3}
+  - EventType: 6
+    Clips:
+    - {fileID: 8300000, guid: 484e4a3938e863146936a539d10e3a41, type: 3}
+    - {fileID: 8300000, guid: 33ea7492fc2119342b15a9828fd1599c, type: 3}
+    - {fileID: 8300000, guid: 6fce95b508b211e468270438d82a09e4, type: 3}
+    - {fileID: 8300000, guid: 90b43ed3007894e46944e786e02272cb, type: 3}
+    - {fileID: 8300000, guid: 2013d7409f1653248843a3d9a4533902, type: 3}
+  - EventType: 7
+    Clips:
+    - {fileID: 8300000, guid: bfe34ba690684b845b8843c57fbef7fb, type: 3}
+    - {fileID: 8300000, guid: 572e2dbc8b5f7184baa15176bf92f65f, type: 3}
+    - {fileID: 8300000, guid: 81a07ddea4541cf4395724642eadaac5, type: 3}
+    - {fileID: 8300000, guid: 31f69ea9810542a4b807eeef46e4291d, type: 3}
+    - {fileID: 8300000, guid: 3736e2e8c9ee4fd46a4225c481d4a529, type: 3}
+  - EventType: 8
+    Clips:
+    - {fileID: 8300000, guid: f950ad5b70c557648a12c6875b61abbc, type: 3}
+    - {fileID: 8300000, guid: a52e6999d9a141747a2388927366ee83, type: 3}
+    - {fileID: 8300000, guid: f7bb89f9c0d7cc549a2019d81da29112, type: 3}
+    - {fileID: 8300000, guid: 944154445cebb984b971e6f691216ab6, type: 3}
+    - {fileID: 8300000, guid: f3c06472cdd7eaa41968f40ee5a38142, type: 3}
+  - EventType: 9
+    Clips:
+    - {fileID: 8300000, guid: ac5590ca128836b438fbf7997f624bae, type: 3}
+    - {fileID: 8300000, guid: 944154445cebb984b971e6f691216ab6, type: 3}
+    - {fileID: 8300000, guid: f3c06472cdd7eaa41968f40ee5a38142, type: 3}
+    - {fileID: 8300000, guid: 903ebd45c3db77441852fc0224e11d07, type: 3}
+    - {fileID: 8300000, guid: 8456d7aa14dfba94eb9788f2c128c8c6, type: 3}
