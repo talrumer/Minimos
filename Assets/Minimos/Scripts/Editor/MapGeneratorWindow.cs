@@ -510,23 +510,8 @@ namespace Minimos.Editor
                                     | Bitgem.VFX.StylisedWater.WaterVolumeBase.TileFace.NegZ
                                     | Bitgem.VFX.StylisedWater.WaterVolumeBase.TileFace.PosZ;
 
-            // Force rebuild so mesh is generated, then paint ALL vertex colors red.
-            // The Bitgem shader uses vertex color RED to mark foam-eligible tiles.
-            // By default only edge tiles get red — we want ALL tiles to be foam-eligible
-            // so the shader's depth-based foam can show foam wherever water meets terrain.
-            EditorApplication.delayCall += () =>
-            {
-                var mf = waterGo.GetComponent<MeshFilter>();
-                if (mf != null && mf.sharedMesh != null)
-                {
-                    var mesh = mf.sharedMesh;
-                    var colors = new Color[mesh.vertexCount];
-                    for (int i = 0; i < colors.Length; i++)
-                        colors[i] = Color.red; // All vertices foam-eligible
-                    mesh.colors = colors;
-                    Debug.Log($"🌊 [Map Generator] Painted {colors.Length} water vertices red for depth-based foam.");
-                }
-            };
+            // Note: foam vertex colors are now always red in WaterVolumeBase.cs
+            // so depth-based foam works everywhere water meets terrain.
 
             // Add a large trigger collider for the water (for detecting when players fall in)
             var waterCollider = waterGo.AddComponent<BoxCollider>();

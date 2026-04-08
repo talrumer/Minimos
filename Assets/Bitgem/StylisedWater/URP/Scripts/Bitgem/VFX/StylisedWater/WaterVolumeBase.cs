@@ -208,10 +208,12 @@ namespace Bitgem.VFX.StylisedWater
                             uvs.Add(new Vector2(ux0, uz1));
                             uvs.Add(new Vector2(ux1, uz1));
                             uvs.Add(new Vector2(ux1, uz0));
-                            colors.Add(foamNegX || foamNegZ || foamNegXnegZ ? Color.red : Color.black);
-                            colors.Add(foamNegX || foamPosZ || foamNegXposZ ? Color.red : Color.black);
-                            colors.Add(foamPosX || foamPosZ || foamPosXposZ ? Color.red : Color.black);
-                            colors.Add(foamPosX || foamNegZ || foamPosXnegZ ? Color.red : Color.black);
+                            // All vertices marked as foam-eligible (red) so depth-based
+                            // foam appears wherever water meets terrain, not just at mesh edges.
+                            colors.Add(Color.red);
+                            colors.Add(Color.red);
+                            colors.Add(Color.red);
+                            colors.Add(Color.red);
                             var v = vertices.Count - 4;
                             if (foamNegX && foamPosZ || foamPosX && foamNegZ)
                             {
