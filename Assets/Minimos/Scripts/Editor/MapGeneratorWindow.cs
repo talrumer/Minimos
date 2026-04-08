@@ -916,6 +916,14 @@ namespace Minimos.Editor
                 {
                     groundY = hit.point.y;
                 }
+
+                // Skip props that would land below water level
+                if (includeWater && groundY < waterLevel + 0.3f)
+                {
+                    Object.DestroyImmediate(prop);
+                    continue;
+                }
+
                 prop.transform.position = new Vector3(pos.x, groundY, pos.z);
 
                 // Random Y rotation
