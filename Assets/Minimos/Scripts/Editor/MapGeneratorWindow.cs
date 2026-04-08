@@ -771,6 +771,8 @@ namespace Minimos.Editor
                     0f,
                     Mathf.Sin(angle) * radius70);
 
+                pos.y = GetGroundHeight(pos) + 1f; // Half player height above ground
+
                 var spawnGo = new GameObject($"Team{i}_Spawn");
                 spawnGo.transform.SetParent(teamRoot.transform);
                 spawnGo.transform.localPosition = pos;
@@ -826,6 +828,8 @@ namespace Minimos.Editor
                     attempts++;
                 } while (attempts < 100 && IsTooCloseToAny(pos, teamSpawnPositions, minDistFromTeam));
 
+                pos.y = GetGroundHeight(pos) + 1f;
+
                 var spawnGo = new GameObject($"PowerUp_Spawn_{i}");
                 spawnGo.transform.SetParent(powerUpRoot.transform);
                 spawnGo.transform.localPosition = pos;
@@ -848,6 +852,8 @@ namespace Minimos.Editor
                     Mathf.Cos(angle) * radius40,
                     0f,
                     Mathf.Sin(angle) * radius40);
+
+                pos.y = GetGroundHeight(pos) + 1f;
 
                 var spawnGo = new GameObject($"Flag_Spawn_{i}");
                 spawnGo.transform.SetParent(flagRoot.transform);
@@ -1117,6 +1123,14 @@ namespace Minimos.Editor
         }
 
         /// <summary>Checks if a position is within a given distance of any point in the list.</summary>
+        /// <summary>Raycasts down to find the ground height at an XZ position. Returns 0 if no ground found.</summary>
+        private static float GetGroundHeight(Vector3 pos)
+        {
+            if (Physics.Raycast(new Vector3(pos.x, 100f, pos.z), Vector3.down, out var hit, 200f, 1 << 8))
+                return hit.point.y;
+            return 0f;
+        }
+
         private static bool IsTooCloseToAny(Vector3 candidate, List<Vector3> points, float minDist)
         {
             float minDistSq = minDist * minDist;
