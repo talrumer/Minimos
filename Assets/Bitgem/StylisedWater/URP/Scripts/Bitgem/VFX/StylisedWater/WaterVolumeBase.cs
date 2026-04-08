@@ -208,24 +208,10 @@ namespace Bitgem.VFX.StylisedWater
                             uvs.Add(new Vector2(ux0, uz1));
                             uvs.Add(new Vector2(ux1, uz1));
                             uvs.Add(new Vector2(ux1, uz0));
-                            // Foam on edges OR near the center of the water volume
-                            // (center region = where island terrain intersects water)
-                            float centerX = maxX * 0.5f;
-                            float centerZ = maxZ * 0.5f;
-                            float distFromCenter = Mathf.Sqrt(
-                                (x - centerX) * (x - centerX) + (z - centerZ) * (z - centerZ));
-                            float maxRadius = Mathf.Max(centerX, centerZ);
-                            // Mark as foam-eligible if within 60% of center (where island is)
-                            bool nearIsland = distFromCenter < maxRadius * 0.6f;
-
-                            bool f0 = foamNegX || foamNegZ || foamNegXnegZ || nearIsland;
-                            bool f1 = foamNegX || foamPosZ || foamNegXposZ || nearIsland;
-                            bool f2 = foamPosX || foamPosZ || foamPosXposZ || nearIsland;
-                            bool f3 = foamPosX || foamNegZ || foamPosXnegZ || nearIsland;
-                            colors.Add(f0 ? Color.red : Color.black);
-                            colors.Add(f1 ? Color.red : Color.black);
-                            colors.Add(f2 ? Color.red : Color.black);
-                            colors.Add(f3 ? Color.red : Color.black);
+                            colors.Add(foamNegX || foamNegZ || foamNegXnegZ ? Color.red : Color.black);
+                            colors.Add(foamNegX || foamPosZ || foamNegXposZ ? Color.red : Color.black);
+                            colors.Add(foamPosX || foamPosZ || foamPosXposZ ? Color.red : Color.black);
+                            colors.Add(foamPosX || foamNegZ || foamPosXnegZ ? Color.red : Color.black);
                             var v = vertices.Count - 4;
                             if (foamNegX && foamPosZ || foamPosX && foamNegZ)
                             {
