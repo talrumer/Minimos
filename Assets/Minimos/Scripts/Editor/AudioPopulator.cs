@@ -188,18 +188,24 @@ namespace Minimos.Editor
             }
 
             // Map announcer events to voice clip filename patterns
+            // Reset cache so we get fresh data
+            cachedAnnouncerClipPaths = null;
+
+            // Patterns use "Contains" matching against actual filenames found in the pack:
+            // vo_commence_*, vo_action_*, vo_spurt_*, vo_positive_*, vo_negative_*,
+            // vo_finish_*, vo_countdown*, vo_result_*, vo_rank_*, vo_combo_*
             var eventMappings = new (AnnouncerEvent evt, string[] patterns)[]
             {
-                (AnnouncerEvent.MatchStart, new[] { "vo_commence_Let" , "vo_commence_Ready", "vo_commence_Start", "vo_commence_Go" }),
-                (AnnouncerEvent.FlagGrabbed, new[] { "vo_action_Grab", "vo_action_Catch", "vo_positive_Nice" }),
-                (AnnouncerEvent.FlagDropped, new[] { "vo_finish_Miss", "vo_negative_Oops", "vo_spurt_Ohh" }),
-                (AnnouncerEvent.BigKnockback, new[] { "vo_spurt_Ahh", "vo_spurt_Ohh", "vo_spurt_Wow" }),
-                (AnnouncerEvent.ScoreMilestone, new[] { "vo_positive_Good", "vo_positive_Nice", "vo_positive_Great" }),
-                (AnnouncerEvent.Comeback, new[] { "vo_positive_Do_Your_Best", "vo_positive_Keep", "vo_positive_Almost" }),
-                (AnnouncerEvent.CloseFinish, new[] { "vo_finish_It's_A_Tie", "vo_finish_Close", "vo_finish_Photo" }),
-                (AnnouncerEvent.FinalSeconds, new[] { "vo_countdown_10", "vo_countdown_05", "vo_time_Time" }),
-                (AnnouncerEvent.RoundWin, new[] { "vo_result_The_Winner", "vo_positive_Great", "vo_rank_First" }),
-                (AnnouncerEvent.PartyWin, new[] { "vo_result_The_Winner", "vo_positive_Amazing", "vo_rank_First", "vo_positive_Incredible" }),
+                (AnnouncerEvent.MatchStart,     new[] { "vo_commence_Begin", "vo_commence_Get_Ready", "vo_commence_Get_Set", "vo_commence_Go", "vo_commence_Let" }),
+                (AnnouncerEvent.FlagGrabbed,    new[] { "vo_action_Grab", "vo_action_Pick_Up", "vo_positive_Nice_Job" }),
+                (AnnouncerEvent.FlagDropped,    new[] { "vo_finish_Miss", "vo_spurt_Ohh", "vo_negative_Better_Luck" }),
+                (AnnouncerEvent.BigKnockback,   new[] { "vo_spurt_Ahh", "vo_spurt_Ohh", "vo_combo_Combo", "vo_action_Hit" }),
+                (AnnouncerEvent.ScoreMilestone, new[] { "vo_positive_Good_Work", "vo_positive_Nice_Job", "vo_positive_Great", "vo_combo_Double" }),
+                (AnnouncerEvent.Comeback,       new[] { "vo_positive_Do_Your_Best", "vo_positive_Keep", "vo_positive_Almost", "vo_positive_You_Can" }),
+                (AnnouncerEvent.CloseFinish,    new[] { "vo_finish_It", "vo_finish_Close", "vo_result_No_Contest" }),
+                (AnnouncerEvent.FinalSeconds,   new[] { "vo_countdown_10", "vo_countdown_05", "vo_countdown_03", "vo_time_Time" }),
+                (AnnouncerEvent.RoundWin,       new[] { "vo_result_The_Winner", "vo_rank_First", "vo_positive_Great" }),
+                (AnnouncerEvent.PartyWin,       new[] { "vo_result_The_Winner", "vo_rank_First", "vo_positive_Incredible", "vo_farewell_See_You" }),
             };
 
             entriesProp.arraySize = eventMappings.Length;
@@ -231,7 +237,15 @@ namespace Minimos.Editor
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(config);
 
-            Debug.Log($"✅ [Audio Populator] AnnouncerConfig populated: {eventMappings.Length} events with voice clips.");
+            // Log per-event counts
+            for (int i = 0; i < eventMappings.Length; i++)
+            {
+                var element = entriesProp.GetArrayElementAtIndex(i);
+                var clipsProp = element.FindPropertyRelative("clips");
+                int count = clipsProp != null ? clipsProp.arraySize : 0;
+                Debug.Log($"  📣 {eventMappings[i].evt}: {count} clip(s)");
+            }
+            Debug.Log($"✅ [Audio Populator] AnnouncerConfig populated: {eventMappings.Length} events.");
         }
 
         // =============================================
@@ -277,22 +291,42 @@ namespace Minimos.Editor
             return clips;
         }
 
-        /// <summary>Find announcer clips matching any of the given filename patterns.</summary>
+        /// <summary>Cached list of all announcer clip paths (loaded once).</summary>
+        private static List<string> cachedAnnouncerClipPaths;
+
+        /// <summary>Load and cache all announcer clip paths.</summary>
+        private static List<string> GetAllAnnouncerClipPaths()
+        {
+            if (cachedAnnouncerClipPaths != null) return cachedAnnouncerClipPaths;
+
+            cachedAnnouncerClipPaths = new List<string>();
+
+            // Use FindAssets across the entire Announcer folder (handles subfolders)
+            var guids = AssetDatabase.FindAssets("t:AudioClip", new[] { "Assets/Casual Game Announcer" });
+            foreach (var guid in guids)
+            {
+                cachedAnnouncerClipPaths.Add(AssetDatabase.GUIDToAssetPath(guid));
+            }
+
+            Debug.Log($"📝 [Audio Populator] Found {cachedAnnouncerClipPaths.Count} announcer clips total.");
+            return cachedAnnouncerClipPaths;
+        }
+
+        /// <summary>Find announcer clips where filename contains any of the given patterns.</summary>
         private static List<AudioClip> FindAnnouncerClips(string[] patterns, int maxClips)
         {
             var clips = new List<AudioClip>();
-            var allGuids = AssetDatabase.FindAssets("t:AudioClip", new[] { AnnouncerPath });
+            var allPaths = GetAllAnnouncerClipPaths();
 
-            foreach (var guid in allGuids)
+            foreach (var path in allPaths)
             {
                 if (clips.Count >= maxClips) break;
 
-                string path = AssetDatabase.GUIDToAssetPath(guid);
                 string fileName = System.IO.Path.GetFileNameWithoutExtension(path);
 
                 foreach (var pattern in patterns)
                 {
-                    if (fileName.StartsWith(pattern))
+                    if (fileName.Contains(pattern))
                     {
                         var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(path);
                         if (clip != null)
@@ -302,6 +336,11 @@ namespace Minimos.Editor
                         }
                     }
                 }
+            }
+
+            if (clips.Count == 0)
+            {
+                Debug.LogWarning($"⚠️ [Audio Populator] No announcer clips matched patterns: {string.Join(", ", patterns)}");
             }
 
             return clips;
