@@ -84,6 +84,14 @@ namespace Minimos.Editor
                 if (tickProp != null) tickProp.objectReferenceValue = countdownTick;
             }
 
+            // Countdown Go — use announcer "Go!" clip
+            var countdownGo = LoadClipFromPath("Assets/Casual Game Announcer/Normal (fx)", "vo_commence_Go");
+            if (countdownGo != null)
+            {
+                var goProp = so.FindProperty("countdownGo");
+                if (goProp != null) goProp.objectReferenceValue = countdownGo;
+            }
+
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(sfxLib);
 
