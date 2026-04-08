@@ -606,10 +606,10 @@ namespace Minimos.Editor
                     {
                         float falloffStart = 0.5f;
                         float falloffEnd = 1.0f;
-                        float t = Mathf.InverseLerp(falloffStart, falloffEnd, edgeDist);
-                        t = t * t * (3f - 2f * t); // smoothstep
+                        float falloff = Mathf.InverseLerp(falloffStart, falloffEnd, edgeDist);
+                        falloff = falloff * falloff * (3f - 2f * falloff); // smoothstep
                         float maxDip = waterLevel - 2f; // dip well below water at edges
-                        islandFalloff = Mathf.Lerp(0f, maxDip - perlinY, t);
+                        islandFalloff = Mathf.Lerp(0f, maxDip - perlinY, falloff);
                     }
                     else
                     {
