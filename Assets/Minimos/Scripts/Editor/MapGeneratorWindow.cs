@@ -483,15 +483,12 @@ namespace Minimos.Editor
             var renderer = waterGo.AddComponent<MeshRenderer>();
 
             // Load the water material
-            // Create a material instance with thinner foam for our island shore
-            var baseMat = AssetDatabase.LoadAssetAtPath<Material>(
+            // Use the exact same material from the Bitgem example scene — it works perfectly there
+            var waterMat = AssetDatabase.LoadAssetAtPath<Material>(
                 "Assets/Bitgem/StylisedWater/URP/Materials/example-water-01.mat");
-            if (baseMat != null)
+            if (waterMat != null)
             {
-                renderer.sharedMaterial = new Material(baseMat);
-                renderer.sharedMaterial.name = "MinimosWater";
-                // Reduce foam width — default 0.65 is too thick for shore foam
-                renderer.sharedMaterial.SetFloat("Vector1_36E8227", 0.15f); // _FoamWidth
+                renderer.sharedMaterial = waterMat;
             }
             else
             {
