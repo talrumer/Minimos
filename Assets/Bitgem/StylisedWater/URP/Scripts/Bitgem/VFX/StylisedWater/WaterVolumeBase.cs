@@ -15,9 +15,9 @@ namespace Bitgem.VFX.StylisedWater
     {
         #region Constants
 
-        public const int MAX_TILES_X = 100;
+        public const int MAX_TILES_X = 400;
         public const int MAX_TILES_Y = 50;
-        public const int MAX_TILES_Z = 100;
+        public const int MAX_TILES_Z = 400;
 
         #endregion
 

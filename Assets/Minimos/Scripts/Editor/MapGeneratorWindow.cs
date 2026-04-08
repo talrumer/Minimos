@@ -501,7 +501,7 @@ namespace Minimos.Editor
             // Add WaterVolumeBox component for wave generation
             var waterVolume = waterGo.AddComponent<Bitgem.VFX.StylisedWater.WaterVolumeBox>();
             waterVolume.Dimensions = new Vector3(WaterExtent * 2f, 0.1f, WaterExtent * 2f);
-            waterVolume.TileSize = 2f; // Must be 2 to cover full extent within MAX_TILES (100) limit
+            waterVolume.TileSize = 0.5f; // Match Bitgem example scene (MAX_TILES raised to 400)
             waterVolume.RealtimeUpdates = false; // Match example scene setting
 
             // Enable foam on all faces
