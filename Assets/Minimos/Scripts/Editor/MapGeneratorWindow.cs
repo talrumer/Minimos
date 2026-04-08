@@ -642,8 +642,8 @@ namespace Minimos.Editor
                     // Vertex color: blend grass → sand based on proximity to water/edge
                     if (includeWater)
                     {
-                        // Sand appears where the island starts sloping (edgeDist > 0.4)
-                        float sandBlend = Mathf.InverseLerp(0.35f, 0.7f, edgeDist);
+                        // Sand only at the very edge — sharp transition
+                        float sandBlend = Mathf.InverseLerp(0.65f, 0.85f, edgeDist);
                         sandBlend = Mathf.Clamp01(sandBlend);
                         colors[i] = Color.Lerp(grassColor, sandColor, sandBlend);
                     }
