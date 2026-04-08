@@ -318,6 +318,13 @@ namespace Minimos.Editor
             var clips = new List<AudioClip>();
             var allPaths = GetAllAnnouncerClipPaths();
 
+            // Debug: log first 3 paths to verify format
+            if (allPaths.Count > 0 && patterns[0].Contains("commence"))
+            {
+                for (int d = 0; d < Mathf.Min(3, allPaths.Count); d++)
+                    Debug.Log($"🔍 [Debug] Sample path [{d}]: '{allPaths[d]}' → filename: '{System.IO.Path.GetFileNameWithoutExtension(allPaths[d])}'");
+            }
+
             foreach (var path in allPaths)
             {
                 if (clips.Count >= maxClips) break;
@@ -340,7 +347,9 @@ namespace Minimos.Editor
 
             if (clips.Count == 0)
             {
-                Debug.LogWarning($"⚠️ [Audio Populator] No announcer clips matched patterns: {string.Join(", ", patterns)}");
+                // Log a few filenames to help debug
+                var sampleNames = allPaths.Take(5).Select(p => System.IO.Path.GetFileNameWithoutExtension(p));
+                Debug.LogWarning($"⚠️ [Audio Populator] 0 clips matched patterns [{string.Join(", ", patterns)}]. Sample filenames: [{string.Join(", ", sampleNames)}]");
             }
 
             return clips;
