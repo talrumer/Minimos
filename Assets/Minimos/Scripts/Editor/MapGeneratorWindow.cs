@@ -501,8 +501,8 @@ namespace Minimos.Editor
             // Add WaterVolumeBox component for wave generation
             var waterVolume = waterGo.AddComponent<Bitgem.VFX.StylisedWater.WaterVolumeBox>();
             waterVolume.Dimensions = new Vector3(WaterExtent * 2f, 0.1f, WaterExtent * 2f);
-            waterVolume.TileSize = 2f; // Larger tiles for performance on big water planes
-            waterVolume.RealtimeUpdates = true;
+            waterVolume.TileSize = 1f; // Smaller tiles = better foam resolution (example uses 0.5)
+            waterVolume.RealtimeUpdates = false; // Match example scene setting
 
             // Enable foam on all faces
             waterVolume.IncludeFoam = Bitgem.VFX.StylisedWater.WaterVolumeBase.TileFace.NegX
@@ -510,8 +510,44 @@ namespace Minimos.Editor
                                     | Bitgem.VFX.StylisedWater.WaterVolumeBase.TileFace.NegZ
                                     | Bitgem.VFX.StylisedWater.WaterVolumeBase.TileFace.PosZ;
 
-            // Note: foam vertex colors are now always red in WaterVolumeBase.cs
-            // so depth-based foam works everywhere water meets terrain.
+            // Paint foam vertex colors on water tiles near the island shore.
+            // The Bitgem shader uses vertex color RED = foam. By default only outer
+            // edges get red. We mark tiles near the island as red so foam shows at the shore.
+            // Must run after the mesh is built (delayCall ensures this).
+            float islandRadius = Mathf.Min(mapSize.x, mapSize.y) * 0.5f;
+            float waterX = waterGo.transform.localPosition.x;
+            float waterZ = waterGo.transform.localPosition.z;
+            EditorApplication.delayCall += () =>
+            {
+                if (waterGo == null) return;
+                var mf = waterGo.GetComponent<MeshFilter>();
+                if (mf == null || mf.sharedMesh == null) return;
+
+                var mesh = mf.sharedMesh;
+                var verts = mesh.vertices;
+                var colors = mesh.colors;
+                if (colors == null || colors.Length != verts.Length)
+                    colors = new Color[verts.Length];
+
+                int painted = 0;
+                for (int i = 0; i < verts.Length; i++)
+                {
+                    // Convert vertex position to world space relative to map center
+                    float wx = verts[i].x + waterGo.transform.position.x;
+                    float wz = verts[i].z + waterGo.transform.position.z;
+                    float distFromCenter = Mathf.Sqrt(wx * wx + wz * wz);
+
+                    // Paint red if within island radius (where shore foam should appear)
+                    if (distFromCenter < islandRadius * 0.9f)
+                    {
+                        colors[i] = Color.red;
+                        painted++;
+                    }
+                }
+
+                mesh.colors = colors;
+                Debug.Log($"🌊 [Map Generator] Painted {painted}/{verts.Length} water vertices for shore foam.");
+            };
 
             // Add a large trigger collider for the water (for detecting when players fall in)
             var waterCollider = waterGo.AddComponent<BoxCollider>();
