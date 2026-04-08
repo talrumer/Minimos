@@ -841,7 +841,13 @@ namespace Minimos.Editor
 
             float halfX = mapSize.x / 2f;
             float halfZ = mapSize.y / 2f;
-            var bounds = new Rect(-halfX, -halfZ, mapSize.x, mapSize.y);
+
+            // When water is enabled, shrink placement bounds to the above-water island area.
+            // The island falloff starts at 50% radius, so use ~40% as safe placement zone.
+            float shrink = includeWater ? 0.4f : 1f;
+            float bx = halfX * shrink;
+            float bz = halfZ * shrink;
+            var bounds = new Rect(-bx, -bz, bx * 2f, bz * 2f);
 
             // Exclusion zones around team spawns
             float exclusionRadius = 8f;
@@ -917,8 +923,9 @@ namespace Minimos.Editor
                     groundY = hit.point.y;
                 }
 
-                // Skip props that would land below water level
-                if (includeWater && groundY < waterLevel + 0.3f)
+                // Skip props that would land at or near water level
+                // Use generous margin so nothing pokes through the water surface
+                if (includeWater && groundY < waterLevel + 1.5f)
                 {
                     Object.DestroyImmediate(prop);
                     continue;
