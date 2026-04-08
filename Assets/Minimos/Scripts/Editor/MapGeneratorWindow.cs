@@ -548,7 +548,7 @@ namespace Minimos.Editor
                 mc.sharedMesh = mesh;
             }
 
-            // Apply material
+            // Apply material — use vertex color shader for island gradient (grass → sand)
             var renderer = groundObj.GetComponent<Renderer>();
             if (renderer != null)
             {
@@ -558,11 +558,22 @@ namespace Minimos.Editor
                 }
                 else
                 {
-                    // Create a URP Lit material with ground color
-                    var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-                    mat.color = selectedTheme.GroundColor;
-                    mat.name = "Ground_Generated";
-                    renderer.sharedMaterial = mat;
+                    // Use our vertex color terrain shader (supports grass→sand gradient)
+                    var terrainShader = Shader.Find("Minimos/TerrainVertexColor");
+                    if (terrainShader != null)
+                    {
+                        var mat = new Material(terrainShader);
+                        mat.name = "Ground_VertexColor";
+                        renderer.sharedMaterial = mat;
+                    }
+                    else
+                    {
+                        // Fallback to URP Lit
+                        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                        mat.color = selectedTheme.GroundColor;
+                        mat.name = "Ground_Generated";
+                        renderer.sharedMaterial = mat;
+                    }
                 }
             }
 
@@ -583,6 +594,11 @@ namespace Minimos.Editor
             // Vertices: (xSize+1) * (zSize+1)
             var vertices = new Vector3[(xSize + 1) * (zSize + 1)];
             var uvs = new Vector2[vertices.Length];
+            var colors = new Color[vertices.Length];
+
+            // Colors: grass (center) → sand (near water edge)
+            Color grassColor = selectedTheme != null ? selectedTheme.GroundColor : new Color(0.45f, 0.75f, 0.35f);
+            Color sandColor = new Color(0.85f, 0.78f, 0.55f); // Warm sandy color
 
             for (int z = 0; z <= zSize; z++)
             {
@@ -622,6 +638,19 @@ namespace Minimos.Editor
                     float y = perlinY + islandFalloff;
                     vertices[i] = new Vector3(worldX, y, worldZ);
                     uvs[i] = new Vector2((float)x / xSize, (float)z / zSize);
+
+                    // Vertex color: blend grass → sand based on proximity to water/edge
+                    if (includeWater)
+                    {
+                        // Sand appears where the island starts sloping (edgeDist > 0.4)
+                        float sandBlend = Mathf.InverseLerp(0.35f, 0.7f, edgeDist);
+                        sandBlend = Mathf.Clamp01(sandBlend);
+                        colors[i] = Color.Lerp(grassColor, sandColor, sandBlend);
+                    }
+                    else
+                    {
+                        colors[i] = grassColor;
+                    }
                 }
             }
 
@@ -649,6 +678,7 @@ namespace Minimos.Editor
             mesh.vertices = vertices;
             mesh.triangles = triangles;
             mesh.uv = uvs;
+            mesh.colors = colors;
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
 
@@ -843,8 +873,9 @@ namespace Minimos.Editor
             float halfZ = mapSize.y / 2f;
 
             // When water is enabled, shrink placement bounds to the above-water island area.
-            // The island falloff starts at 50% radius, so use ~40% as safe placement zone.
-            float shrink = includeWater ? 0.4f : 1f;
+            // The island falloff starts at 50% radius — use 70% so props scatter to near the shore.
+            // The per-prop water level check (in PlacePropCategory) catches any that land too low.
+            float shrink = includeWater ? 0.7f : 1f;
             float bx = halfX * shrink;
             float bz = halfZ * shrink;
             var bounds = new Rect(-bx, -bz, bx * 2f, bz * 2f);
